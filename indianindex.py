@@ -1,4 +1,8 @@
 import time
+import gzip
+import io
+import json
+from datetime import datetime
 from fastapi import APIRouter
 
 router = APIRouter()
@@ -9,13 +13,68 @@ DEFAULT_INDICES = {
     "SENSEX": {"ltp": 76106.15, "ch": -423.49, "chp": -0.56, "market_status": "GREEN"},
 }
 
-INDICES_KEYS = [
-    "NSE_INDEX|Nifty 50",
-    "NSE_INDEX|Nifty Bank",
-    "BSE_INDEX|SENSEX",
-    "MCX_FO|483079",
-    "MCX_FO|584777"
-]
+# Cache for dynamic MCX keys to avoid downloading instrument file on every request
+MCX_KEY_CACHE = {
+    "crude_key": "MCX_FO|584777",  # Fallback
+    "gold_key": "MCX_FO|483079",   # Fallback
+    "last_fetched": 0
+}
+
+def get_dynamic_mcx_keys(session):
+    global MCX_KEY_CACHE
+    now = time.time()
+    # Refresh once every 24 hours
+    if now - MCX_KEY_CACHE["last_fetched"] < 86400 and MCX_KEY_CACHE["crude_key"] != "MCX_FO|584777":
+        return MCX_KEY_CACHE["crude_key"], MCX_KEY_CACHE["gold_key"]
+    
+    try:
+        url = "https://assets.upstox.com/market-quote/instruments/exchange/MCX.json.gz"
+        res = session.get(url, timeout=5)
+        if res.status_code == 200:
+            content = gzip.decompress(res.content).decode('utf-8')
+            instruments = json.loads(content)
+            
+            today = datetime.now().date()
+            crude_candidates = []
+            gold_candidates = []
+            
+            for inst in instruments:
+                sym = inst.get("trading_symbol", "")
+                instrument_type = inst.get("instrument_type", "")
+                expiry = inst.get("expiry", 0)
+                
+                # Filter for Crude Oil Futures
+                if "CRUDEOIL" in sym and instrument_type == "FUT":
+                    try:
+                        exp_date = datetime.fromtimestamp(int(expiry) / 1000).date() if isinstance(expiry, (int, float)) else datetime.strptime(str(expiry)[:10], "%Y-%m-%d").date()
+                        if exp_date >= today:
+                            crude_candidates.append((exp_date, inst.get("instrument_key")))
+                    except Exception:
+                        pass
+                        
+                # Filter for Gold Futures
+                if "GOLD" in sym and instrument_type == "FUT" and "MINI" not in sym:
+                    try:
+                        exp_date = datetime.fromtimestamp(int(expiry) / 1000).date() if isinstance(expiry, (int, float)) else datetime.strptime(str(expiry)[:10], "%Y-%m-%d").date()
+                        if exp_date >= today:
+                            gold_candidates.append((exp_date, inst.get("instrument_key")))
+                    except Exception:
+                        pass
+            
+            # Sort by nearest expiry
+            if crude_candidates:
+                crude_candidates.sort(key=lambda x: x[0])
+                MCX_KEY_CACHE["crude_key"] = crude_candidates[0][1]
+                
+            if gold_candidates:
+                gold_candidates.sort(key=lambda x: x[0])
+                MCX_KEY_CACHE["gold_key"] = gold_candidates[0][1]
+                
+            MCX_KEY_CACHE["last_fetched"] = now
+    except Exception as e:
+        print(f"Error fetching dynamic MCX keys: {str(e)}")
+        
+    return MCX_KEY_CACHE["crude_key"], MCX_KEY_CACHE["gold_key"]
 
 def fetch_upstox_indices(session, access_token, cache, global_cache, api_timeout, is_cache_valid_func, load_cache_func, save_cache_func, health_ok_func, health_fail_func):
     now = time.time()
@@ -29,11 +88,21 @@ def fetch_upstox_indices(session, access_token, cache, global_cache, api_timeout
         health_fail_func("upstox", "ACCESS_TOKEN is missing", action="Add a valid Upstox access token.")
         return indices_parsed
     
+    crude_key, gold_key = get_dynamic_mcx_keys(session)
+    
+    indices_keys = [
+        "NSE_INDEX|Nifty 50",
+        "NSE_INDEX|Nifty Bank",
+        "BSE_INDEX|SENSEX",
+        gold_key,
+        crude_key
+    ]
+    
     try:
         res = session.get(
             "https://api.upstox.com/v2/market-quote/quotes",
             headers={'Accept': 'application/json', 'Authorization': f'Bearer {access_token}'},
-            params={'instrument_key': ",".join(INDICES_KEYS)},
+            params={'instrument_key': ",".join(indices_keys)},
             timeout=api_timeout
         )
         
@@ -75,7 +144,7 @@ def fetch_upstox_indices(session, access_token, cache, global_cache, api_timeout
                         indices_parsed["SENSEX"] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2), "market_status": "GREEN"}
 
                 for k, v in raw.items():
-                    if "483079" in k or "gold" in k.lower():
+                    if gold_key.split("|")[-1] in k or "gold" in k.lower():
                         g_ltp = float(v.get('last_price', 0) or 0)
                         g_close = float(v.get('ohlc', {}).get('close', 0) or g_ltp)
                         if g_ltp == 0 and g_close > 0: g_ltp = g_close
@@ -84,7 +153,7 @@ def fetch_upstox_indices(session, access_token, cache, global_cache, api_timeout
                         if g_ltp > 0:
                             global_cache["GOLD_MCX"] = {"symbol": "GOLD_MCX", "ltp": round(g_ltp, 2), "ch": round(g_ch, 2), "chp": round(g_chp, 2), "market_status": "GREEN"}
                     
-                    if "584777" in k or "crude" in k.lower():
+                    if crude_key.split("|")[-1] in k or "crude" in k.lower():
                         c_ltp = float(v.get('last_price', 0) or 0)
                         c_close = float(v.get('ohlc', {}).get('close', 0) or c_ltp)
                         if c_ltp == 0 and c_close > 0: c_ltp = c_close
