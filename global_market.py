@@ -54,7 +54,7 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
             if k in GLOBAL_CACHE:
                 GLOBAL_CACHE[k] = v
 
-        # 1. Fetch US Indices & Dow Future from TradingView
+        # 1. Fetch US Spot Indices from TradingView
         tv_headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Origin": "https://www.tradingview.com",
@@ -62,7 +62,7 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
         }
         tv_payload = {
             "symbols": {
-                "tickers": ["TVC:DJI", "CBOT:YM1!", "TVC:IXIC", "TVC:SPX", "SP:SPX", "AMEX:SPY"]
+                "tickers": ["TVC:DJI", "TVC:IXIC", "TVC:SPX", "SP:SPX", "AMEX:SPY"]
             },
             "columns": ["close", "change", "change_abs"]
         }
@@ -83,8 +83,6 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
                         
                         if s == "TVC:DJI":
                             GLOBAL_CACHE["DOW"] = {**item_data, "symbol": "DOW", "market_status": "RED"}
-                        elif s == "CBOT:YM1!":
-                            GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": round(p, 2), "market_status": "RED"}
                         elif s == "TVC:IXIC":
                             GLOBAL_CACHE["NASDAQ"] = {**item_data, "symbol": "NASDAQ", "market_status": "RED"}
                         elif "SPX" in s or "SPY" in s:
@@ -93,8 +91,9 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
                                 item_data = {"ltp": round(p, 2), "ch": round(ch, 2), "chp": chp}
                             GLOBAL_CACHE["SP500"] = {**item_data, "symbol": "SP500", "market_status": "RED"}
 
-        # 2. Fetch Nikkei, Oil, and Gold from Yahoo Finance
+        # 2. Fetch Dow Future, Nikkei, Oil, and Gold from Yahoo Finance
         yahoo_mapping = {
+            "DOW_FUT": "YM=F",
             "NIKKEI": "^N225",
             "WTI_CRUDE": "CL=F",
             "BRENT": "BZ=F",
@@ -103,7 +102,10 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
         for sym, ticker in yahoo_mapping.items():
             y_data = fetch_yahoo_symbol(session, sym, ticker)
             if y_data:
-                GLOBAL_CACHE[sym] = y_data
+                if sym == "DOW_FUT":
+                    GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": y_data["ltp"]}
+                else:
+                    GLOBAL_CACHE[sym] = y_data
 
         health_ok_func("tradingview", "Hybrid global fetch successful.")
         persisted = load_cache_func()
