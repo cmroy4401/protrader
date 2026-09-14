@@ -123,7 +123,7 @@ SECTOR_MAPPING = {
     "NIFTY Energy": "NSE_INDEX|Nifty Energy",
     "NIFTY PSE": "NSE_INDEX|Nifty PSE",
     "Nifty India Defence": "NSE_INDEX|Nifty India Defence",
-    "NIFTY India Mfg": "NSE_INDEX|Nifty India Mfg",
+    "Nifty India Mfg": "NSE_INDEX|Nifty India Mfg",
     "MIDSMALL IT": "NSE_INDEX|Nifty MidSmall IT & Telecom",
     "NIFTY Bank": "NSE_INDEX|Nifty Bank"
 }
@@ -160,7 +160,7 @@ def build_health():
             if checks[key]["status"] == "ERROR":
                 checks[key]["status"] = "WARNING"
                 checks[key]["action"] = "Indian market is closed; re-check when NSE/BSE opens."
-    stale_limits = {"upstox": 15, "sectors": 20, "tradingview": 30}
+    stale_limits = {"upstox": 25, "sectors": 35, "tradingview": 30}
     for key, limit in stale_limits.items():
         last = checks[key].get("last_success", 0) or 0
         if checks[key]["status"] == "OK" and last and now - last > limit and (market_open or key not in ("upstox", "sectors")):
@@ -176,7 +176,7 @@ _cache = {"indices_time": 0, "indices_data": {}, "sectors_time": 0, "sectors_dat
 
 def fetch_upstox_indices():
     now = time.time()
-    if now - _cache["indices_time"] < 1.5 and _cache["indices_data"]:
+    if now - _cache["indices_time"] < 4.0 and _cache["indices_data"]:
         return _cache["indices_data"]
     
     persisted = load_persistent_cache()
@@ -238,7 +238,7 @@ def fetch_upstox_indices():
 
 def fetch_upstox_sectors():
     now = time.time()
-    if now - _cache["sectors_time"] < 2.0 and _cache["sectors_data"]:
+    if now - _cache["sectors_time"] < 6.0 and _cache["sectors_data"]:
         return _cache["sectors_data"]
     
     persisted = load_persistent_cache()
@@ -272,6 +272,7 @@ def fetch_upstox_sectors():
                             chp = float(item.get('change_percent', 0) or ((ch / close * 100) if close > 0 else 0))
                             if ltp > 0:
                                 sectors_parsed[sec_name] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2)}
+            time.sleep(0.15)
         except Exception as e:
             health_fail("sectors", e, action="Check Upstox sector API response and network.")
 
@@ -289,7 +290,7 @@ def fetch_tradingview_batch():
     payload = {
         "symbols": {
             "tickers": [
-                "TVC:DJI", "TVC:IXIC", "CBOT_MINI:YM1!", "TVC:SPX", "TVC:NI225",
+                "TVC:DJI", "TVC:IXIC", "CBOT_MINI:YM1!", "TVC:SPX", "CAPITALCOM:US500", "TVC:NI225",
                 "TVC:HSI", "SSE:000001", "TVC:KOSPI",
                 "TVC:DEU40", "TVC:CAC40", "TVC:UKX",
                 "NYMEX:CL1!", "NYMEX:BZ1!", "TVC:GOLD", "BINANCE:BTCUSDT"
@@ -313,7 +314,7 @@ def fetch_tradingview_batch():
 
                     if "DJI" in s: GLOBAL_CACHE["DOW"] = {**item_data, "symbol": "DOW", "market_status": "RED"}
                     elif "IXIC" in s: GLOBAL_CACHE["NASDAQ"] = {**item_data, "symbol": "NASDAQ", "market_status": "RED"}
-                    elif "SPX" in s: GLOBAL_CACHE["SP500"] = {**item_data, "symbol": "SP500", "market_status": "RED"}
+                    elif "SPX" in s or "US500" in s: GLOBAL_CACHE["SP500"] = {**item_data, "symbol": "SP500", "market_status": "RED"}
                     elif "NI225" in s: GLOBAL_CACHE["NIKKEI"] = {**item_data, "symbol": "NIKKEI", "market_status": "RED"}
                     elif "KOSPI" in s: GLOBAL_CACHE["KOSPI"] = {**item_data, "symbol": "KOSPI", "market_status": "RED"}
                     elif "YM1!" in s: GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": round(p, 2), "market_status": "RED"}
