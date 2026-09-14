@@ -97,7 +97,7 @@ def load_persistent_cache():
         try:
             with open(CACHE_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if data and "indices" in data and len(data["indices"]) > 0:
+                if data:
                     return data
         except Exception as e:
             logger.warning(f"Error loading cache file: {str(e)}")
@@ -160,13 +160,6 @@ def get_health():
             if checks[key]["status"] == "ERROR":
                 checks[key]["status"] = "WARNING"
                 checks[key]["action"] = "Indian market is closed; re-check when NSE/BSE opens."
-    stale_limits = {"upstox": 25, "sectors": 35, "tradingview": 30}
-    for key, limit in stale_limits.items():
-        last = checks[key].get("last_success", 0) or 0
-        if checks[key]["status"] == "OK" and last and now - last > limit:
-            if market_open or key not in ("upstox", "sectors"):
-                checks[key]["status"] = "WARNING"
-                checks[key]["action"] = f"Data is stale ({int(now - last)}s old). Re-fetching..."
     
     has_error = any(v["status"] == "ERROR" for v in checks.values())
     has_warning = any(v["status"] == "WARNING" for v in checks.values())
@@ -233,7 +226,33 @@ def get_scanner_gainers_losers():
     return gainernlosser.get_gainers_losers(session, API_TIMEOUT)
 
 def background_worker():
+    # Initial fetch on startup
+    try:
+        global_market.fetch_tradingview_global(
+            session=session,
+            api_timeout=API_TIMEOUT,
+            load_cache_func=load_persistent_cache,
+            save_cache_func=save_persistent_cache,
+            health_ok_func=health_ok,
+            health_fail_func=health_fail
+        )
+    except Exception as e:
+        logger.error(f"Background global fetch error: {str(e)}")
+
+    try:
+        otherglobal.fetch_tradingview_other_global(
+            session=session,
+            api_timeout=API_TIMEOUT,
+            load_cache_func=load_persistent_cache,
+            save_cache_func=save_persistent_cache,
+            health_ok_func=health_ok,
+            health_fail_func=health_fail
+        )
+    except Exception as e:
+        logger.error(f"Background other_global fetch error: {str(e)}")
+
     while True:
+        time.sleep(BACKGROUND_FETCH_INTERVAL)
         try:
             global_market.fetch_tradingview_global(
                 session=session,
@@ -256,7 +275,6 @@ def background_worker():
             )
         except Exception:
             pass
-        time.sleep(BACKGROUND_FETCH_INTERVAL)
 
 threading.Thread(target=background_worker, daemon=True).start()
 
