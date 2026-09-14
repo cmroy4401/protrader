@@ -13,20 +13,20 @@ DEFAULT_INDICES = {
 }
 
 MCX_KEY_CACHE = {
-    "crude_key": None,
-    "gold_key": None,
+    "crude_key": "MCX_FO|584777",
+    "gold_key": "MCX_FO|483079",
     "last_fetched": 0
 }
 
 def get_dynamic_mcx_keys(session):
     global MCX_KEY_CACHE
     now = time.time()
-    if now - MCX_KEY_CACHE["last_fetched"] < 86400 and MCX_KEY_CACHE["crude_key"] and MCX_KEY_CACHE["gold_key"]:
+    if now - MCX_KEY_CACHE["last_fetched"] < 86400 and MCX_KEY_CACHE["crude_key"] != "MCX_FO|584777":
         return MCX_KEY_CACHE["crude_key"], MCX_KEY_CACHE["gold_key"]
     
     try:
         url = "https://assets.upstox.com/market-quote/instruments/exchange/MCX.json.gz"
-        res = session.get(url, timeout=6)
+        res = session.get(url, timeout=5)
         if res.status_code == 200:
             content = gzip.decompress(res.content).decode('utf-8')
             instruments = json.loads(content)
@@ -70,7 +70,7 @@ def get_dynamic_mcx_keys(session):
     except Exception as e:
         print(f"Error fetching dynamic MCX keys: {str(e)}")
         
-    return MCX_KEY_CACHE.get("crude_key"), MCX_KEY_CACHE.get("gold_key")
+    return MCX_KEY_CACHE["crude_key"], MCX_KEY_CACHE["gold_key"]
 
 def fetch_upstox_indices(session, access_token, cache, global_cache, api_timeout, is_cache_valid_func, load_cache_func, save_cache_func, health_ok_func, health_fail_func):
     now = time.time()
@@ -78,6 +78,7 @@ def fetch_upstox_indices(session, access_token, cache, global_cache, api_timeout
     persisted = load_cache_func()
     indices_parsed = dict(persisted.get("indices", DEFAULT_INDICES))
     
+    # CRITICAL FIX: Load persistent global cache into global_cache immediately so 0.00 never shows up
     persisted_global = persisted.get("global", {})
     for k, v in persisted_global.items():
         if k not in global_cache or global_cache[k].get("ltp", 0) == 0:
@@ -91,9 +92,6 @@ def fetch_upstox_indices(session, access_token, cache, global_cache, api_timeout
         return indices_parsed
     
     crude_key, gold_key = get_dynamic_mcx_keys(session)
-    if not crude_key or not gold_key:
-        health_fail_func("upstox", "Could not resolve MCX active keys")
-        return indices_parsed
     
     indices_keys = [
         "NSE_INDEX|Nifty 50",
@@ -116,9 +114,40 @@ def fetch_upstox_indices(session, access_token, cache, global_cache, api_timeout
             if js.get('status') == 'success':
                 health_ok_func("upstox", "Upstox indices request succeeded.")
                 raw = js.get('data', {})
+                norm = {k.lower().replace("|", ":").strip(): v for k, v in raw.items()}
                 
+                if "nse_index:nifty 50" in norm:
+                    item = norm["nse_index:nifty 50"]
+                    ltp = float(item.get('last_price', 0) or 0)
+                    close = float(item.get('ohlc', {}).get('close', 0) or ltp)
+                    if ltp == 0 and close > 0: ltp = close
+                    ch = float(item.get('net_change', 0) or (ltp - close))
+                    chp = float(item.get('change_percent', 0) or ((ch / close * 100) if close > 0 else 0))
+                    if ltp > 0:
+                        indices_parsed["NIFTY"] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2), "market_status": "GREEN"}
+                
+                if "nse_index:nifty bank" in norm:
+                    item = norm["nse_index:nifty bank"]
+                    ltp = float(item.get('last_price', 0) or 0)
+                    close = float(item.get('ohlc', {}).get('close', 0) or ltp)
+                    if ltp == 0 and close > 0: ltp = close
+                    ch = float(item.get('net_change', 0) or (ltp - close))
+                    chp = float(item.get('change_percent', 0) or ((ch / close * 100) if close > 0 else 0))
+                    if ltp > 0:
+                        indices_parsed["BANKNIFTY"] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2), "market_status": "GREEN"}
+                
+                if "bse_index:sensex" in norm:
+                    item = norm["bse_index:sensex"]
+                    ltp = float(item.get('last_price', 0) or 0)
+                    close = float(item.get('ohlc', {}).get('close', 0) or ltp)
+                    if ltp == 0 and close > 0: ltp = close
+                    ch = float(item.get('net_change', 0) or (ltp - close))
+                    chp = float(item.get('change_percent', 0) or ((ch / close * 100) if close > 0 else 0))
+                    if ltp > 0:
+                        indices_parsed["SENSEX"] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2), "market_status": "GREEN"}
+
                 for k, v in raw.items():
-                    if gold_key in k or "gold" in k.lower():
+                    if gold_key.split("|")[-1] in k or "gold" in k.lower():
                         g_ltp = float(v.get('last_price', 0) or 0)
                         g_close = float(v.get('ohlc', {}).get('close', 0) or g_ltp)
                         if g_ltp == 0 and g_close > 0: g_ltp = g_close
@@ -127,7 +156,7 @@ def fetch_upstox_indices(session, access_token, cache, global_cache, api_timeout
                         if g_ltp > 0:
                             global_cache["GOLD_MCX"] = {"symbol": "GOLD_MCX", "ltp": round(g_ltp, 2), "ch": round(g_ch, 2), "chp": round(g_chp, 2), "market_status": "GREEN"}
                     
-                    if crude_key in k or "crude" in k.lower():
+                    if crude_key.split("|")[-1] in k or "crude" in k.lower():
                         c_ltp = float(v.get('last_price', 0) or 0)
                         c_close = float(v.get('ohlc', {}).get('close', 0) or c_ltp)
                         if c_ltp == 0 and c_close > 0: c_ltp = c_close
@@ -136,7 +165,7 @@ def fetch_upstox_indices(session, access_token, cache, global_cache, api_timeout
                         if c_ltp > 0:
                             global_cache["CRUDE_MCX"] = {"symbol": "CRUDE_MCX", "ltp": round(c_ltp, 2), "ch": round(c_ch, 2), "chp": round(c_chp, 2), "market_status": "GREEN"}
         else:
-            health_fail_func("upstox", f"HTTP {res.status_code} - Check Upstox Access Token", res.status_code)
+            health_fail_func("upstox", f"HTTP {res.status_code}", res.status_code)
     except Exception as e:
         health_fail_func("upstox", str(e))
     
