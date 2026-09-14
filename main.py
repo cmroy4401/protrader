@@ -246,11 +246,13 @@ def fetch_upstox_sectors():
         return _cache["sectors_data"]
     
     persisted = load_persistent_cache()
+    base_sectors = persisted.get("sectors", DEFAULT_SECTORS)
+    sectors_parsed = dict(base_sectors) 
+
     if not ACCESS_TOKEN:
         health_fail("sectors", "ACCESS_TOKEN is missing", action="Add a valid Upstox access token in .env.")
-        return persisted.get("sectors", DEFAULT_SECTORS)
+        return sectors_parsed
 
-    sectors_parsed = {}
     keys_list = list(SECTOR_MAPPING.values())
     
     for i in range(0, len(keys_list), 5):
@@ -287,7 +289,7 @@ def fetch_upstox_sectors():
         save_persistent_cache(persisted)
         return sectors_parsed
     
-    return persisted.get("sectors", DEFAULT_SECTORS)
+    return base_sectors
 
 def fetch_tradingview_batch():
     headers = {"User-Agent": "Mozilla/5.0", "Origin": "https://www.tradingview.com", "Referer": "https://www.tradingview.com/"}
