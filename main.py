@@ -148,13 +148,12 @@ def is_indian_market_open():
 def is_cache_valid(cache_time, cache_duration):
     return time.time() - cache_time < cache_duration
 
-# Updated active MCX Crude Oil contract key along with Gold
 INDICES_KEYS = [
     "NSE_INDEX|Nifty 50",
     "NSE_INDEX|Nifty Bank",
     "BSE_INDEX|SENSEX",
     "MCX_FO|483079",
-    "MCX_FO|574635"
+    "MCX_FO|584777"
 ]
 
 SECTOR_MAPPING = {
@@ -304,7 +303,7 @@ def fetch_upstox_indices():
                         if g_ltp > 0:
                             GLOBAL_CACHE["GOLD_MCX"] = {"symbol": "GOLD_MCX", "ltp": round(g_ltp, 2), "ch": round(g_ch, 2), "chp": round(g_chp, 2), "market_status": "GREEN"}
                     
-                    if "574635" in k or "crude" in k.lower():
+                    if "584777" in k or "crude" in k.lower():
                         c_ltp = float(v.get('last_price', 0) or 0)
                         c_close = float(v.get('ohlc', {}).get('close', 0) or c_ltp)
                         if c_ltp == 0 and c_close > 0: c_ltp = c_close
