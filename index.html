@@ -14,7 +14,9 @@
         .health-badge.warning { border-color:#f59e0b; background:rgba(245,158,11,.14); color:#fbbf24; }
         .health-badge.error { border-color:#ef4444; background:rgba(239,68,68,.16); color:#f87171; animation: healthAlarm 1.1s infinite alternate; }
         @keyframes healthAlarm { from { box-shadow:0 0 5px rgba(239,68,68,.25); } to { box-shadow:0 0 18px rgba(239,68,68,.75); } }
-        .health-panel { display:none; position:absolute; top:100%; right:0; width:min(390px,calc(100vw - 24px)); margin-top:6px; background:#111113; border:1px solid #27272a; border-radius:8px; padding:9px; box-shadow:0 10px 30px rgba(0,0,0,.55); }
+        
+        /* Fixed and scrollable health panel to prevent layout overflow */
+        .health-panel { display:none; position:absolute; top:100%; right:0; width:min(360px, calc(100vw - 24px)); max-height:220px; overflow-y:auto; margin-top:6px; background:#111113; border:1px solid #27272a; border-radius:8px; padding:9px; box-shadow:0 10px 30px rgba(0,0,0,.85); z-index:99999; }
         .health-panel.show { display:block; }
         .health-title { font-size:10px; font-weight:900; color:#fff; margin-bottom:7px; }
         .health-row { display:grid; grid-template-columns:88px 72px 1fr; gap:6px; padding:5px 0; border-top:1px solid #27272a; font-size:8px; align-items:start; }
@@ -23,6 +25,7 @@
         .health-detail { color:#a1a1aa; line-height:1.35; }
         .health-detail b { color:#d4d4d8; }
         .health-ok { color:#34d399; } .health-warning { color:#fbbf24; } .health-error { color:#f87171; }
+        
         .health-toast { position:fixed; top:52px; right:12px; z-index:10000; width:min(390px,calc(100vw - 24px)); padding:10px 12px; border-radius:8px; border:1px solid #27272a; background:#18181b; box-shadow:0 10px 35px rgba(0,0,0,.7); display:none; }
         .health-toast.show { display:block; animation:toastIn .25s ease-out; }
         .health-toast.warning { border-color:#f59e0b; } .health-toast.error { border-color:#ef4444; } .health-toast.resolved { border-color:#10b981; }
@@ -144,7 +147,6 @@
         .tile-pct { font-size: 8px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
 
         .green-neon { color: #34d399; } .red-neon { color: #f87171; } .white-text { color: #ffffff; }
-        .vwap-above { color: #34d399; } .vwap-below { color: #f87171; }
     </style>
 </head>
 <body>
