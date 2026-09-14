@@ -37,11 +37,11 @@
         .green { color: var(--green); }
         .red { color: var(--red); }
 
-        /* Fix for Other Global Markets text truncation */
+        /* Restored original 2-column compact grid design with adjusted font for fit */
         .other-global-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
         .mini-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; }
-        .mini-name { font-size: 0.75rem; color: var(--text-primary); font-weight: 600; white-space: nowrap; overflow: visible; text-overflow: clip; }
-        .mini-val { font-size: 0.75rem; text-align: right; }
+        .mini-name { font-size: 0.7rem; color: var(--text-primary); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
+        .mini-val { font-size: 0.72rem; text-align: right; }
         
         .sector-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
         .sector-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; }
@@ -130,7 +130,6 @@
     <script>
         async function updateData() {
             try {
-                // Fetch Spots
                 let resSpots = await fetch('/api/spots');
                 let dataSpots = await resSpots.json();
                 if(dataSpots.status === 'success') {
@@ -159,7 +158,6 @@
                     }
                 }
 
-                // Fetch Global Symbols
                 let globals = ['DOW', 'NASDAQ', 'SP500', 'NIKKEI', 'CRUDE', 'GOLD_MCX', 'HANGSENG', 'FTSE', 'DAX', 'CAC', 'KOSPI', 'SHANGHAI', 'BRENT'];
                 for(let sym of globals) {
                     try {
@@ -183,11 +181,10 @@
                     } catch(e){}
                 }
 
-                // Fetch Other Global Markets List
                 let otherGlobals = [
                     {name: 'Hang Seng', sym: 'HANGSENG'},
                     {name: 'FTSE 100', sym: 'FTSE'},
-                    {name: 'DAX Germany', sym: 'DAX'},
+                    {name: 'DAX', sym: 'DAX'},
                     {name: 'CAC 40', sym: 'CAC'},
                     {name: 'KOSPI', sym: 'KOSPI'},
                     {name: 'Shanghai', sym: 'SHANGHAI'},
@@ -201,7 +198,7 @@
                         let color = (d.chp >= 0) ? 'green' : 'red';
                         otherHtml += `
                             <div class="mini-card">
-                                <div class="mini-name">${item.name}</div>
+                                <div class="mini-name" title="${item.name}">${item.name}</div>
                                 <div class="mini-val">
                                     <div style="font-weight:700;">${d.ltp ? d.ltp.toLocaleString() : '0.00'}</div>
                                     <div class="${color}" style="font-size:0.65rem;">${(d.chp >= 0 ? '+' : '') + (d.chp || 0).toFixed(2)}%</div>
@@ -212,7 +209,6 @@
                 }
                 document.getElementById('other-global-container').innerHTML = otherHtml;
 
-                // Fetch Sectors
                 let resSec = await fetch('/api/sectors');
                 let sectors = await resSec.json();
                 let secHtml = '';
