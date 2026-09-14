@@ -281,7 +281,7 @@ def fetch_upstox_indices():
                     ch = float(item.get('net_change', 0) or (ltp - close))
                     chp = float(item.get('change_percent', 0) or ((ch / close * 100) if close > 0 else 0))
                     if ltp > 0:
-                        indices_parsed["BANKNIFTY"] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2), "market_status": "GREEN"}
+                        indices_parsed["BANKNIFTY"] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(ch, 2), "market_status": "GREEN"}
                 
                 if "bse_index:sensex" in norm:
                     item = norm["bse_index:sensex"]
@@ -538,40 +538,42 @@ def get_gainers_losers():
         "Origin": "https://www.tradingview.com",
         "Referer": "https://www.tradingview.com/"
     }
-    payload = {
-        "filter": [{"left": "type", "operation": "equal", "right": "stock"}, {"left": "exchange", "operation": "equal", "right": "NSE"}],
-        "symbols": {"query": {"types": []}},
-        "columns": ["name", "close", "change", "change_abs", "volume"],
-        "sort": {"sortBy": "change", "sortOrder": "desc"},
-        "range": [0, 500]
-    }
-    try:
-        r = session.post("https://scanner.tradingview.com/india/scan", json=payload, headers=headers, timeout=API_TIMEOUT)
-        if r.status_code == 200:
-            res_data = r.json()
-            items = []
-            for row in res_data.get("data", []):
-                s_symbol = row.get("s", "").split(":")[-1]
-                if s_symbol in FNO_SYMBOLS:
-                    vals = row.get("d", [])
-                    if len(vals) >= 5:
-                        items.append({
-                            "symbol": s_symbol,
-                            "name": vals[0],
-                            "ltp": round(float(vals[1] or 0), 2),
-                            "chp": round(float(vals[2] or 0), 2),
-                            "ch": round(float(vals[3] or 0), 2),
-                            "volume": int(vals[4] or 0)
-                        })
-            if items:
-                items.sort(key=lambda x: x["chp"], reverse=True)
-                top_gainers = items[:6]
-                top_losers = sorted(items, key=lambda x: x["chp"])[:6]
-                return {"status": "success", "gainers": top_gainers, "losers": top_losers}
-    except Exception as e:
-        logger.error(f"Scanner fetch error: {str(e)}")
-    
-    return {"status": "success", "gainers": [], "losers": []}
+
+    def fetch_scan(sort_order, count=6):
+        payload = {
+            "filter": [{"left": "type", "operation": "equal", "right": "stock"}, {"left": "exchange", "operation": "equal", "right": "NSE"}],
+            "symbols": {"query": {"types": []}},
+            "columns": ["name", "close", "change", "change_abs", "volume"],
+            "sort": {"sortBy": "change", "sortOrder": sort_order},
+            "range": [0, 150]
+        }
+        try:
+            r = session.post("https://scanner.tradingview.com/india/scan", json=payload, headers=headers, timeout=API_TIMEOUT)
+            if r.status_code == 200:
+                res_data = r.json()
+                matched = []
+                for row in res_data.get("data", []):
+                    s_symbol = row.get("s", "").split(":")[-1]
+                    if s_symbol in FNO_SYMBOLS:
+                        vals = row.get("d", [])
+                        if len(vals) >= 5:
+                            matched.append({
+                                "symbol": s_symbol,
+                                "name": vals[0],
+                                "ltp": round(float(vals[1] or 0), 2),
+                                "chp": round(float(vals[2] or 0), 2),
+                                "ch": round(float(vals[3] or 0), 2),
+                                "volume": int(vals[4] or 0)
+                            })
+                return matched[:count]
+        except Exception as e:
+            logger.error(f"Scanner fetch error: {str(e)}")
+        return []
+
+    top_gainers = fetch_scan("desc", 6)
+    top_losers = fetch_scan("asc", 6)
+
+    return {"status": "success", "gainers": top_gainers, "losers": top_losers}
 
 @app.get("/api/sectors")
 def get_sectors():
