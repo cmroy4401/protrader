@@ -294,7 +294,7 @@ def fetch_tradingview_batch():
     payload = {
         "symbols": {
             "tickers": [
-                "TVC:DJI", "TVC:IXIC", "TVC:SPX", "SP:SPX", "AMEX:SPY", "FOREXCOM:SPXUSD", "TVC:NI225",
+                "TVC:DJI", "TVC:IXIC", "CBOT_MINI:YM1!", "TVC:SPX", "SP:SPX", "AMEX:SPY", "FOREXCOM:SPXUSD", "TVC:NI225",
                 "TVC:HSI", "SSE:000001", "TVC:KOSPI",
                 "TVC:DEU40", "TVC:CAC40", "TVC:UKX",
                 "NYMEX:CL1!", "NYMEX:BZ1!", "TVC:GOLD", "BINANCE:BTCUSDT"
@@ -317,9 +317,9 @@ def fetch_tradingview_batch():
                     item_data = {"ltp": round(p, 2), "ch": round(ch, 2), "chp": round(chp, 2)}
 
                     if "DJI" in s: GLOBAL_CACHE["DOW"] = {**item_data, "symbol": "DOW", "market_status": "RED"}
+                    elif "YM1!" in s: GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": round(p, 2), "market_status": "RED"}
                     elif "IXIC" in s: GLOBAL_CACHE["NASDAQ"] = {**item_data, "symbol": "NASDAQ", "market_status": "RED"}
                     elif "SPX" in s or "SPXUSD" in s:
-                        # Ensure correct scaling if SPY ETF or similar is parsed
                         if "SPY" in s and p < 1000:
                             p *= 10
                             ch *= 10
@@ -338,6 +338,9 @@ def fetch_tradingview_batch():
                         if p < 5000:
                             GLOBAL_CACHE["XAUUSD"] = {**item_data, "symbol": "XAUUSD", "market_status": "RED"}
                     elif "BTCUSDT" in s: GLOBAL_CACHE["BTC"] = {**item_data, "symbol": "BTC", "market_status": "GREEN"}
+
+            if "DOW" in GLOBAL_CACHE and "DOW_FUT" in GLOBAL_CACHE:
+                GLOBAL_CACHE["DOW"]["fut"] = GLOBAL_CACHE["DOW_FUT"]["ltp"]
 
             persisted = load_persistent_cache()
             persisted["global"] = GLOBAL_CACHE
@@ -370,14 +373,21 @@ def get_global(symbol: str):
     sym = symbol.upper()
     if sym in ["SNP500", "SPX"]:
         sym = "SP500"
+    if sym == "DOW" and "DOW" in GLOBAL_CACHE and "DOW_FUT" in GLOBAL_CACHE:
+        GLOBAL_CACHE["DOW"]["fut"] = GLOBAL_CACHE["DOW_FUT"]["ltp"]
     if sym in GLOBAL_CACHE:
         return GLOBAL_CACHE[sym]
     persisted = load_persistent_cache()
     cached_global = persisted.get("global", {})
     if sym in ["SNP500", "SPX"]:
         sym = "SP500"
+    if sym == "DOW" and "DOW" in cached_global and "DOW_FUT" in cached_global:
+        cached_global["DOW"]["fut"] = cached_global["DOW_FUT"]["ltp"]
     if sym in cached_global:
-        return cached_global[cached_global_key] if (cached_global_key := next((k for k in cached_global if k.upper() == sym), None)) else cached_global[sym]
+        cached_global_key = next((k for k in cached_global if k.upper() == sym), None)
+        return cached_global[cached_global_key] if cached_global_key else cached_global[sym]
+    if sym == "DOW":
+        return {"symbol": "DOW", "ltp": 43500.00, "fut": 43550.00, "ch": 100.00, "chp": 0.23, "market_status": "RED"}
     return {"symbol": symbol.upper(), "ltp": 5850.00, "ch": 25.50, "chp": 0.44, "market_status": "RED"}
 
 @app.get("/api/sectors")
