@@ -570,7 +570,7 @@
                 });
 
                 const tickResults = await Promise.allSettled(
-                    tickerSymbols.map(sym => fetch(`/api/global?symbol=${sym}`).then(r => r.json()))
+                    tickerSymbols.map(sym => fetch(`/api/other-global?symbol=${sym}`).then(r => r.json()))
                 );
                 tickResults.forEach((res, i) => {
                     let sym = tickerSymbols[i];
@@ -579,7 +579,7 @@
                     if (res.status === "fulfilled" && res.value && res.value.ltp !== undefined) {
                         let t1 = document.getElementById(`tick-${sym}`);
                         let sub1 = document.getElementById(`tsub-${sym}`);
-                        let valStr = Number(res.value.ltp).toLocaleString('en-US');
+                        let valStr = Number(res.value.ltp).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                         let sign = res.value.ch >= 0 ? "+" : "";
                         let subStr = `${sign}${Number(res.value.ch).toFixed(2)} (${sign}${Number(res.value.chp).toFixed(2)}%)`;
                         let colorClass = res.value.ch >= 0 ? "green-neon" : "red-neon";
