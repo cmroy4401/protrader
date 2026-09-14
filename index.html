@@ -126,7 +126,7 @@
         .ticker-item .ticker-name { font-weight: 700; color: #a1a1aa; font-size: 9.5px; text-transform: uppercase; }
         .ticker-item .ticker-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; }
         .ticker-item .ticker-sub { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 8px; }
-        @media (min-width: 600px) { .ticker-move { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+        @media (min-width: 600px) { .ticker-move { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
         .heatmap-box { background: #141417; border: 1px solid #27272a; border-radius: 8px; padding: 8px; box-sizing: border-box; box-shadow: 0 4px 15px rgba(0,0,0,0.35); }
         .heatmap-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; width: 100%; }
@@ -282,8 +282,8 @@
         }
         buildIndianBoxes();
 
-        const tickerSymbols = ["HANGSENG", "FTSE", "DAX", "CAC", "KOSPI", "SHANGHAI", "BTC"];
-        const tickerNames = {"HANGSENG":"Hang Seng", "FTSE":"FTSE 100", "DAX":"DAX Germany", "CAC":"CAC 40", "KOSPI":"KOSPI", "SHANGHAI":"Shanghai", "BTC":"Bitcoin"};
+        const tickerSymbols = ["HANGSENG", "FTSE", "DAX", "CAC", "KOSPI", "SHANGHAI"];
+        const tickerNames = {"HANGSENG":"Hang Seng", "FTSE":"FTSE 100", "DAX":"DAX Germany", "CAC":"CAC 40", "KOSPI":"KOSPI", "SHANGHAI":"Shanghai"};
         
         function buildTicker() {
             let html = "";
@@ -311,7 +311,6 @@
             let day = ist.getDay();
             let hours = ist.getHours() + (ist.getMinutes() / 60);
 
-            if (sym === "BTC") return true;
             if (day === 0 || day === 6) return false;
 
             if (["NIFTY", "BANKNIFTY", "SENSEX"].includes(sym)) {
