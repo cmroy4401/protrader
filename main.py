@@ -17,7 +17,7 @@ import indianindex
 import global_market
 import otherglobal
 import sectorheatmap
-import scanner
+import gainernlosser
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,7 +39,7 @@ app.add_middleware(
 # Include Routers
 app.include_router(global_market.router)
 app.include_router(otherglobal.router)
-app.include_router(scanner.router)
+app.include_router(gainernlosser.router)
 
 STATIC_DIR = Path(__file__).parent / "static" if (Path(__file__).parent / "static").exists() else Path(__file__).parent
 CACHE_FILE = Path(__file__).parent / "market_cache.json"
@@ -230,7 +230,7 @@ def get_sectors():
 
 @app.get("/api/scanner/gainers-losers")
 def get_scanner_gainers_losers():
-    return scanner.get_gainers_losers(session, API_TIMEOUT)
+    return gainernlosser.get_gainers_losers(session, API_TIMEOUT)
 
 def background_worker():
     while True:
