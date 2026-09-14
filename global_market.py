@@ -12,7 +12,6 @@ GLOBAL_CACHE = {
     "NASDAQ": {"symbol": "NASDAQ", "ltp": 18500.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
     "SP500": {"symbol": "SP500", "ltp": 5850.00, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
     "NIKKEI": {"symbol": "NIKKEI", "ltp": 38000.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
-    "WTI_CRUDE": {"symbol": "WTI_CRUDE", "ltp": 70.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
     "BRENT": {"symbol": "BRENT", "ltp": 74.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
     "XAUUSD": {"symbol": "XAUUSD", "ltp": 2650.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"}
 }
@@ -91,11 +90,10 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
                                 item_data = {"ltp": round(p, 2), "ch": round(ch, 2), "chp": chp}
                             GLOBAL_CACHE["SP500"] = {**item_data, "symbol": "SP500", "market_status": "RED"}
 
-        # 2. Fetch Dow Future, Nikkei, Oil, and Gold from Yahoo Finance
+        # 2. Fetch Dow Future, Nikkei, Brent, and Gold USD from Yahoo Finance
         yahoo_mapping = {
             "DOW_FUT": "YM=F",
             "NIKKEI": "^N225",
-            "WTI_CRUDE": "CL=F",
             "BRENT": "BZ=F",
             "XAUUSD": "GC=F"
         }
@@ -148,10 +146,7 @@ def get_global(symbol: str):
         }
 
     if sym in ["OIL", "CRUDE", "BRENT"]:
-        mcx_crude = GLOBAL_CACHE.get("CRUDE_MCX", {})
-        if not mcx_crude or mcx_crude.get("ltp", 0) == 0:
-            mcx_crude = GLOBAL_CACHE.get("WTI_CRUDE", {"ltp": 0, "ch": 0, "chp": 0})
-            
+        mcx_crude = GLOBAL_CACHE.get("CRUDE_MCX", {"ltp": 0, "ch": 0, "chp": 0})
         brent = GLOBAL_CACHE.get("BRENT", {"ltp": 0, "ch": 0, "chp": 0})
         return {
             "symbol": "OIL",
