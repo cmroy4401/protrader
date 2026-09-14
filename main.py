@@ -290,7 +290,7 @@ def fetch_tradingview_batch():
     payload = {
         "symbols": {
             "tickers": [
-                "TVC:DJI", "TVC:IXIC", "CBOT_MINI:YM1!", "TVC:SPX", "CAPITALCOM:US500", "TVC:NI225",
+                "TVC:DJI", "TVC:IXIC", "FOREXCOM:SPXUSD", "TVC:NI225",
                 "TVC:HSI", "SSE:000001", "TVC:KOSPI",
                 "TVC:DEU40", "TVC:CAC40", "TVC:UKX",
                 "NYMEX:CL1!", "NYMEX:BZ1!", "TVC:GOLD", "BINANCE:BTCUSDT"
@@ -314,10 +314,9 @@ def fetch_tradingview_batch():
 
                     if "DJI" in s: GLOBAL_CACHE["DOW"] = {**item_data, "symbol": "DOW", "market_status": "RED"}
                     elif "IXIC" in s: GLOBAL_CACHE["NASDAQ"] = {**item_data, "symbol": "NASDAQ", "market_status": "RED"}
-                    elif "SPX" in s or "US500" in s: GLOBAL_CACHE["SP500"] = {**item_data, "symbol": "SP500", "market_status": "RED"}
+                    elif "SPX" in s or "SPXUSD" in s: GLOBAL_CACHE["SP500"] = {**item_data, "symbol": "SP500", "market_status": "RED"}
                     elif "NI225" in s: GLOBAL_CACHE["NIKKEI"] = {**item_data, "symbol": "NIKKEI", "market_status": "RED"}
                     elif "KOSPI" in s: GLOBAL_CACHE["KOSPI"] = {**item_data, "symbol": "KOSPI", "market_status": "RED"}
-                    elif "YM1!" in s: GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": round(p, 2), "market_status": "RED"}
                     elif "HSI" in s: GLOBAL_CACHE["HANGSENG"] = {**item_data, "symbol": "HANGSENG", "market_status": "RED"}
                     elif "000001" in s: GLOBAL_CACHE["SHANGHAI"] = {**item_data, "symbol": "SHANGHAI", "market_status": "RED"}
                     elif "DEU40" in s: GLOBAL_CACHE["DAX"] = {**item_data, "symbol": "DAX", "market_status": "RED"}
@@ -329,9 +328,6 @@ def fetch_tradingview_batch():
                         if p < 5000:
                             GLOBAL_CACHE["XAUUSD"] = {**item_data, "symbol": "XAUUSD", "market_status": "RED"}
                     elif "BTCUSDT" in s: GLOBAL_CACHE["BTC"] = {**item_data, "symbol": "BTC", "market_status": "GREEN"}
-            
-            if "DOW" in GLOBAL_CACHE and "DOW_FUT" in GLOBAL_CACHE:
-                GLOBAL_CACHE["DOW"]["fut"] = GLOBAL_CACHE["DOW_FUT"]["ltp"]
 
             persisted = load_persistent_cache()
             persisted["global"] = GLOBAL_CACHE
@@ -364,16 +360,12 @@ def get_global(symbol: str):
     sym = symbol.upper()
     if sym in ["SNP500", "SPX"]:
         sym = "SP500"
-    if sym == "DOW" and "DOW" in GLOBAL_CACHE and "DOW_FUT" in GLOBAL_CACHE:
-        GLOBAL_CACHE["DOW"]["fut"] = GLOBAL_CACHE["DOW_FUT"]["ltp"]
     if sym in GLOBAL_CACHE:
         return GLOBAL_CACHE[sym]
     persisted = load_persistent_cache()
     cached_global = persisted.get("global", {})
     if sym in ["SNP500", "SPX"]:
         sym = "SP500"
-    if sym == "DOW" and "DOW" in cached_global and "DOW_FUT" in cached_global:
-        cached_global["DOW"]["fut"] = cached_global["DOW_FUT"]["ltp"]
     if sym in cached_global:
         return cached_global[sym]
     return {"symbol": symbol.upper(), "ltp": 0, "ch": 0, "chp": 0, "market_status": "RED"}

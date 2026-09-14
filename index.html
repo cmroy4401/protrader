@@ -13,16 +13,17 @@
         .header h1 { margin: 0; font-size: 18px; font-weight: 800; } .header h1 span { color: #3b82f6; } 
         .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+        /* Fixed Health Panel Overlay for mobile and desktop */
         .health-wrap { position: relative; z-index: 9999; font-family: 'JetBrains Mono', monospace; }
         .health-badge { display:flex; align-items:center; gap:5px; padding:6px 9px; border-radius:6px; border:1px solid #10b981; background:rgba(16,185,129,.14); color:#34d399; font-size:9.5px; font-weight:900; cursor:pointer; box-shadow:0 0 10px rgba(16,185,129,.15); user-select:none; white-space: nowrap; }
         .health-badge.warning { border-color:#f59e0b; background:rgba(245,158,11,.14); color:#fbbf24; }
         .health-badge.error { border-color:#ef4444; background:rgba(239,68,68,.16); color:#f87171; animation: healthAlarm 1.1s infinite alternate; }
         @keyframes healthAlarm { from { box-shadow:0 0 5px rgba(239,68,68,.25); } to { box-shadow:0 0 18px rgba(239,68,68,.75); } }
         
-        .health-panel { display:none; position:absolute; top:calc(100% + 6px); right:0; width:min(320px, calc(100vw - 32px)); max-height:220px; overflow-y:auto; background:#111113; border:1px solid #27272a; border-radius:8px; padding:9px; box-shadow:0 10px 30px rgba(0,0,0,.9); z-index:99999; }
+        .health-panel { display:none; position:fixed; top:60px; right:10px; width:min(360px, calc(100vw - 20px)); max-height:75vh; overflow-y:auto; background:#111113; border:1px solid #27272a; border-radius:8px; padding:10px; box-shadow:0 10px 40px rgba(0,0,0,.95); z-index:99999; }
         .health-panel.show { display:block; }
-        .health-title { font-size:10px; font-weight:900; color:#fff; margin-bottom:7px; }
-        .health-row { display:grid; grid-template-columns:75px 65px 1fr; gap:6px; padding:5px 0; border-top:1px solid #27272a; font-size:8px; align-items:start; }
+        .health-title { font-size:10.5px; font-weight:900; color:#fff; margin-bottom:7px; }
+        .health-row { display:grid; grid-template-columns:75px 65px 1fr; gap:6px; padding:6px 0; border-top:1px solid #27272a; font-size:8.5px; align-items:start; }
         .health-source { color:#fff; font-weight:800; }
         .health-state { font-weight:900; }
         .health-detail { color:#a1a1aa; line-height:1.35; }
