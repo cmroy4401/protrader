@@ -14,7 +14,7 @@ from config import ACCESS_TOKEN
 
 # Import modular router files
 import indianindex
-import global as global_market
+import global_market
 import otherglobal
 import sectorheatmap
 import scanner
