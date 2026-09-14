@@ -153,11 +153,13 @@ def is_indian_market_open():
 def is_cache_valid(cache_time, cache_duration):
     return time.time() - cache_time < cache_duration
 
+# Added MCX Crude Oil key along with Gold and Indices
 INDICES_KEYS = [
     "NSE_INDEX|Nifty 50",
     "NSE_INDEX|Nifty Bank",
     "BSE_INDEX|SENSEX",
-    "MCX_FO|483079"
+    "MCX_FO|483079",
+    "MCX_FO|426554"  # MCX Crude Oil Instrument Key (Standard active contract)
 ]
 
 SECTOR_MAPPING = {
@@ -297,6 +299,7 @@ def fetch_upstox_indices():
                     if ltp > 0:
                         indices_parsed["SENSEX"] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2), "market_status": "GREEN"}
 
+                # Capture Gold & Crude Oil from Upstox raw data
                 for k, v in raw.items():
                     if "483079" in k or "gold" in k.lower():
                         g_ltp = float(v.get('last_price', 0) or 0)
@@ -306,6 +309,15 @@ def fetch_upstox_indices():
                         g_chp = float(v.get('change_percent', 0) or ((g_ch / g_close * 100) if g_close > 0 else 0))
                         if g_ltp > 0:
                             GLOBAL_CACHE["GOLD_MCX"] = {"symbol": "GOLD_MCX", "ltp": round(g_ltp, 2), "ch": round(g_ch, 2), "chp": round(g_chp, 2), "market_status": "GREEN"}
+                    
+                    if "426554" in k or "crude" in k.lower():
+                        c_ltp = float(v.get('last_price', 0) or 0)
+                        c_close = float(v.get('ohlc', {}).get('close', 0) or c_ltp)
+                        if c_ltp == 0 and c_close > 0: c_ltp = c_close
+                        c_ch = float(v.get('net_change', 0) or (c_ltp - c_close))
+                        c_chp = float(v.get('change_percent', 0) or ((c_ch / c_close * 100) if c_close > 0 else 0))
+                        if c_ltp > 0:
+                            GLOBAL_CACHE["CRUDE_MCX"] = {"symbol": "CRUDE_MCX", "ltp": round(c_ltp, 2), "ch": round(c_ch, 2), "chp": round(c_chp, 2), "market_status": "GREEN"}
         else:
             health_fail("upstox", f"HTTP {res.status_code}", res.status_code)
     except Exception as e:
@@ -466,6 +478,7 @@ def get_global(symbol: str):
     if sym in ["SNP500", "SPX"]:
         sym = "SP500"
     
+    # Combined response for Gold (USD + INR MCX)
     if sym in ["GOLD", "XAUUSD"]:
         xau = GLOBAL_CACHE.get("XAUUSD", {"ltp": 0, "ch": 0, "chp": 0})
         mcx = GLOBAL_CACHE.get("GOLD_MCX", {"ltp": 0, "ch": 0, "chp": 0})
@@ -477,6 +490,21 @@ def get_global(symbol: str):
             "inr": mcx.get("ltp", 0),
             "inr_ch": mcx.get("ch", 0),
             "inr_chp": mcx.get("chp", 0),
+            "market_status": "RED"
+        }
+
+    # Combined response for Oil (WTI/Crude from MCX + Brent from TradingView)
+    if sym in ["OIL", "CRUDE"]:
+        mcx_crude = GLOBAL_CACHE.get("CRUDE_MCX", {"ltp": 0, "ch": 0, "chp": 0})
+        brent = GLOBAL_CACHE.get("BRENT", {"ltp": 0, "ch": 0, "chp": 0})
+        return {
+            "symbol": "OIL",
+            "ltp": mcx_crude.get("ltp", 0),       # MCX Crude Price in INR
+            "ch": mcx_crude.get("ch", 0),
+            "chp": mcx_crude.get("chp", 0),
+            "brent_ltp": brent.get("ltp", 0),     # Brent Price in USD
+            "brent_ch": brent.get("ch", 0),
+            "brent_chp": brent.get("chp", 0),
             "market_status": "RED"
         }
 
