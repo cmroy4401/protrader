@@ -514,7 +514,24 @@ def get_global(symbol: str):
     
     return {"symbol": symbol.upper(), "ltp": 0, "ch": 0, "chp": 0, "market_status": "UNKNOWN"}
 
-# --- SCANNER API ENDPOINT FOR TOP 6 GAINERS & LOSERS ---
+# List of prominent NSE FNO stocks to filter strictly
+FNO_SYMBOLS = {
+    "RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK", "SBIN", "TATAMOTORS", 
+    "AXISBANK", "BAJFINANCE", "MARUTI", "SUNPHARMA", "ITC", "LT", "KOTAKBANK", 
+    "NTPC", "ONGC", "POWERGRID", "TATASTEEL", "HINDUNILVR", "BHARTIARTL", 
+    "HCLTECH", "WIPRO", "ADANIENT", "ADANIPORTS", "ASIANPAINT", "BAJAJFINSV", 
+    "BPCL", "BRITANNIA", "CIPLA", "COALINDIA", "DIVISLAB", "DRREDDY", 
+    "EICHERMOT", "GRASIM", "HEROMOTOCO", "HINDALCO", "JSWSTEEL", "M&M", 
+    "NESTLEIND", "SBILIFE", "SHRIRAMFIN", "TATACONSUM", "TECHM", 
+    "TITAN", "ULTRACEMCO", "UPL", "ZOMATO", "PAYTM", "NYKAA", "PNB", 
+    "BANKBARODA", "CANBK", "IDFCFIRSTB", "INDUSINDBK", "ASTRAL", "DIXON", 
+    "LUPIN", "NMDC", "PEL", "PIDILITIND", "SIEMENS", "SRF", "TORNTPHARM", 
+    "VEDL", "VOLTAS", "CHOLAFIN", "DABUR", "GODREJCP", "HAVELLS", 
+    "ICICIGI", "JINDALSTEL", "LTIM", "MCDOWELL-N", "MOTHERSON", "NAUKRI", 
+    "PIIND", "POLYCAB", "SBICARD", "TVSMOTOR", "HAL", "BEL", "ABB", "BHEL",
+    "JIOFIN", "OBEROIRLTY", "APOLLOHOSP", "LICI", "MUTHOOTFIN", "PERSISTENT"
+}
+
 @app.get("/api/scanner/gainers-losers")
 def get_gainers_losers():
     headers = {
@@ -527,7 +544,7 @@ def get_gainers_losers():
         "symbols": {"query": {"types": []}},
         "columns": ["name", "close", "change", "change_abs", "volume"],
         "sort": {"sortBy": "change", "sortOrder": "desc"},
-        "range": [0, 30]
+        "range": [0, 200]
     }
     try:
         r = session.post("https://scanner.tradingview.com/india/scan", json=payload, headers=headers, timeout=API_TIMEOUT)
@@ -535,16 +552,18 @@ def get_gainers_losers():
             res_data = r.json()
             items = []
             for row in res_data.get("data", []):
-                vals = row.get("d", [])
-                if len(vals) >= 5:
-                    items.append({
-                        "symbol": row.get("s", "").split(":")[-1],
-                        "name": vals[0],
-                        "ltp": round(float(vals[1] or 0), 2),
-                        "chp": round(float(vals[2] or 0), 2),
-                        "ch": round(float(vals[3] or 0), 2),
-                        "volume": int(vals[4] or 0)
-                    })
+                s_symbol = row.get("s", "").split(":")[-1]
+                if s_symbol in FNO_SYMBOLS:
+                    vals = row.get("d", [])
+                    if len(vals) >= 5:
+                        items.append({
+                            "symbol": s_symbol,
+                            "name": vals[0],
+                            "ltp": round(float(vals[1] or 0), 2),
+                            "chp": round(float(vals[2] or 0), 2),
+                            "ch": round(float(vals[3] or 0), 2),
+                            "volume": int(vals[4] or 0)
+                        })
             items.sort(key=lambda x: x["chp"], reverse=True)
             top_gainers = items[:6]
             top_losers = sorted(items, key=lambda x: x["chp"])[:6]
@@ -552,7 +571,7 @@ def get_gainers_losers():
     except Exception as e:
         logger.error(f"Scanner fetch error: {str(e)}")
     
-    # Fallback dummy data if offline/error
+    # Fallback FNO dummy data
     dummy_gainers = [{"symbol": "RELIANCE", "name": "Reliance", "ltp": 2950.0, "chp": 3.45, "ch": 98.5, "volume": 1200000},
                        {"symbol": "TCS", "name": "TCS", "ltp": 4120.0, "chp": 2.85, "ch": 114.0, "volume": 900000},
                        {"symbol": "INFY", "name": "Infosys", "ltp": 1850.0, "chp": 2.10, "ch": 38.0, "volume": 850000},
