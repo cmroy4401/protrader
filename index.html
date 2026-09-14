@@ -3,236 +3,655 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PRO TRADER - Live Terminal</title>
+    <title>PRO TRADER - Custom Terminal</title>
     <style>
-        :root {
-            --bg-color: #0b0e14;
-            --card-bg: #131722;
-            --border-color: #2a2e39;
-            --text-primary: #d1d4dc;
-            --text-secondary: #787b86;
-            --green: #089981;
-            --red: #f23645;
-            --accent: #2962ff;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background-color: var(--bg-color); color: var(--text-primary); padding: 10px; }
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
-        h1 { font-size: 1.2rem; color: var(--text-primary); font-weight: 700; }
-        .market-status-badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
-        .market-status-badge.live { background: rgba(8, 153, 129, 0.2); color: var(--green); border: 1px solid var(--green); }
-        .market-status-badge.closed { background: rgba(242, 54, 69, 0.2); color: var(--red); border: 1px solid var(--red); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;700;800;900&display=swap');
+        body { background-color: #09090b; color: #f8fafc; font-family: 'Inter', sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
         
-        .section-title { font-size: 0.85rem; text-transform: uppercase; color: var(--text-secondary); margin: 15px 0 8px 2px; font-weight: 600; letter-spacing: 0.5px; }
-        
-        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
-        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px; }
-        
-        .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; position: relative; overflow: hidden; }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .card-title { font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; }
-        .card-ltp { font-size: 1.05rem; font-weight: 700; margin-bottom: 2px; }
-        .card-sub { font-size: 0.7rem; display: flex; justify-content: space-between; }
-        
-        .green { color: var(--green); }
-        .red { color: var(--red); }
+        /* Automatic System Health */
+        .health-wrap { position: relative; z-index: 9999; font-family: 'JetBrains Mono', monospace; }
+        .health-badge { display:flex; align-items:center; gap:6px; padding:7px 10px; border-radius:6px; border:1px solid #10b981; background:rgba(16,185,129,.14); color:#34d399; font-size:10px; font-weight:900; cursor:pointer; box-shadow:0 0 12px rgba(16,185,129,.15); user-select:none; }
+        .health-badge.warning { border-color:#f59e0b; background:rgba(245,158,11,.14); color:#fbbf24; }
+        .health-badge.error { border-color:#ef4444; background:rgba(239,68,68,.16); color:#f87171; animation: healthAlarm 1.1s infinite alternate; }
+        @keyframes healthAlarm { from { box-shadow:0 0 5px rgba(239,68,68,.25); } to { box-shadow:0 0 18px rgba(239,68,68,.75); } }
+        .health-panel { display:none; position:absolute; top:100%; right:0; width:min(390px,calc(100vw - 24px)); margin-top:6px; background:#111113; border:1px solid #27272a; border-radius:8px; padding:9px; box-shadow:0 10px 30px rgba(0,0,0,.55); }
+        .health-panel.show { display:block; }
+        .health-title { font-size:10px; font-weight:900; color:#fff; margin-bottom:7px; }
+        .health-row { display:grid; grid-template-columns:88px 72px 1fr; gap:6px; padding:5px 0; border-top:1px solid #27272a; font-size:8px; align-items:start; }
+        .health-source { color:#fff; font-weight:800; }
+        .health-state { font-weight:900; }
+        .health-detail { color:#a1a1aa; line-height:1.35; }
+        .health-detail b { color:#d4d4d8; }
+        .health-ok { color:#34d399; } .health-warning { color:#fbbf24; } .health-error { color:#f87171; }
+        .health-toast { position:fixed; top:52px; right:12px; z-index:10000; width:min(390px,calc(100vw - 24px)); padding:10px 12px; border-radius:8px; border:1px solid #27272a; background:#18181b; box-shadow:0 10px 35px rgba(0,0,0,.7); display:none; }
+        .health-toast.show { display:block; animation:toastIn .25s ease-out; }
+        .health-toast.warning { border-color:#f59e0b; } .health-toast.error { border-color:#ef4444; } .health-toast.resolved { border-color:#10b981; }
+        .health-toast-head { font-size:11px; font-weight:900; margin-bottom:3px; }
+        .health-toast-body { font-size:9px; color:#d4d4d8; line-height:1.4; }
+        @keyframes toastIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+        @media (max-width:650px) { .health-badge { font-size:9px; padding:6px 8px; } .health-panel { right:0; } }
 
-        /* Restored original 2-column compact grid design with adjusted font for fit */
-        .other-global-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .mini-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; }
-        .mini-name { font-size: 0.7rem; color: var(--text-primary); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
-        .mini-val { font-size: 0.72rem; text-align: right; }
+        .header { display: flex; flex-direction: column; gap: 8px; background: linear-gradient(90deg, #18181b, #09090b); padding: 12px 20px; border-radius: 10px; border: 1px solid #27272a; margin-bottom: 12px; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .header h1 { margin: 0; font-size: 20px; font-weight: 800; } .header h1 span { color: #3b82f6; } 
+        .header-right { display: flex; align-items: center; gap: 10px; }
         
-        .sector-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .sector-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; }
-        .sector-name { font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 4px; }
-        .sector-data { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: bold; }
+        @keyframes feedBlinkPulse {
+            0% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px #10b981; }
+            50% { opacity: 0.3; transform: scale(0.75); box-shadow: 0 0 2px #10b981; }
+            100% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px #10b981; }
+        }
+        @keyframes feedRedPulse {
+            0% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px #ef4444; }
+            50% { opacity: 0.3; transform: scale(0.75); box-shadow: 0 0 2px #ef4444; }
+            100% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px #ef4444; }
+        }
+        @keyframes feedAmberPulse {
+            0% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px #f59e0b; }
+            50% { opacity: 0.3; transform: scale(0.75); box-shadow: 0 0 2px #f59e0b; }
+            100% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px #f59e0b; }
+        }
+
+        .live-pulse { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+        .dot { height: 9px; width: 9px; border-radius: 50%; display: inline-block; background-color: #10b981; animation: feedBlinkPulse 1.2s infinite ease-in-out; }
+        .is-live { color: #10b981; text-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; margin-bottom: 6px; padding: 0 2px; }
+        .section-title { font-size: 11.5px; color: #a1a1aa; text-transform: uppercase; font-weight: 800; letter-spacing: 0.8px; margin: 0; }
+        .live-tag { font-size: 9px; font-family: 'JetBrains Mono', monospace; font-weight: 700; border-radius: 4px; padding: 2px 7px; }
         
-        #error-banner { background: rgba(242, 54, 69, 0.15); border: 1px solid var(--red); color: var(--red); padding: 8px; border-radius: 4px; font-size: 0.75rem; margin-bottom: 10px; display: none; }
+        .tab-nav { display: flex; gap: 8px; margin-top: 8px; }
+        .tab-btn { font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 5px; border: 1px solid #27272a; background-color: #18181b; color: #a1a1aa; cursor: pointer; transition: all 0.3s ease; }
+        .tab-btn:hover { background-color: #27272a; border-color: #3b82f6; }
+        .tab-btn.active { background-color: #3b82f6; color: #ffffff; border-color: #3b82f6; box-shadow: 0 0 10px rgba(59, 130, 246, 0.3); }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .top-indices-row { display: flex; justify-content: space-between; gap: 6px; width: 100%; flex-wrap: wrap; }
+        .index-box { flex: 1; min-width: 100px; background-color: #18181b; border: 1px solid #27272a; border-top: 2px solid #3b82f6; border-radius: 6px; padding: 6px 3px; text-align: center; }
+        .global-box { border-top: 2px solid #f59e0b; } 
+        
+        .index-header-row { display: flex; align-items: center; justify-content: center; gap: 5px; margin-bottom: 2px; }
+        .index-name { font-size: 9.5px; color: #a1a1aa; text-transform: uppercase; font-weight: 700; }
+        
+        .mini-dot { height: 9px; width: 9px; min-width: 9px; border-radius: 50%; display: inline-block; }
+        .mini-dot-live { background-color: #10b981 !important; animation: feedBlinkPulse 1.2s infinite ease-in-out !important; box-shadow: 0 0 10px #10b981 !important; }
+        .mini-dot-closed { background-color: #ef4444 !important; animation: feedRedPulse 1.2s infinite ease-in-out !important; box-shadow: 0 0 10px #ef4444 !important; }
+        .mini-dot-futures { background-color: #f59e0b !important; animation: feedAmberPulse 1.4s infinite ease-in-out !important; box-shadow: 0 0 10px #f59e0b !important; }
+
+        .index-ltp { font-size: 13.5px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        .index-sub { font-size: 9.5px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+        .fut-badge-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 3px 6px 1px 6px;
+            margin-top: 3px;
+            border-top: 1px solid #27272a;
+        }
+        .fut-tag {
+            font-size: 8px;
+            font-weight: 800;
+            color: #fbbf24;
+            background: rgba(251, 191, 36, 0.15);
+            border: 1px solid rgba(251, 191, 36, 0.35);
+            border-radius: 3px;
+            padding: 1px 4px;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.5px;
+        }
+        .fut-val {
+            color: #fbbf24;
+            font-size: 13px;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            text-align: right;
+            padding-right: 2px;
+            letter-spacing: 0.2px;
+        }
+
+        .split-row { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; }
+        .split-label { font-size: 9px; color: #a1a1aa; font-weight: bold; }
+        .split-ltp { font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        .split-sub { font-size: 8px; font-family: 'JetBrains Mono', monospace; }
+        .split-line { border-bottom: 1px solid #27272a; margin: 2px 0; }
+
+        .ticker-wrap { width: 100%; background-color: #141417; border: 1px solid #27272a; border-radius: 8px; overflow: hidden; padding: 8px; margin-top: 10px; box-sizing: border-box; box-shadow: 0 4px 15px rgba(0,0,0,0.35); }
+        .ticker-move { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; width: 100%; }
+        .ticker-item { display: flex; align-items: center; justify-content: space-between; min-height: 34px; padding: 5px 8px; font-size: 10.5px; background: #18181b; border: 1px solid #27272a; border-radius: 5px; box-sizing: border-box; }
+        .ticker-item-left { display: flex; align-items: center; gap: 6px; }
+        .ticker-item-right { display: flex; flex-direction: column; align-items: flex-end; }
+        .ticker-item .ticker-name { font-weight: 700; color: #a1a1aa; font-size: 9.5px; text-transform: uppercase; }
+        .ticker-item .ticker-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; }
+        .ticker-item .ticker-sub { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 8.5px; }
+        @media (min-width: 600px) { .ticker-move { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+        .heatmap-box { background: #141417; border: 1px solid #27272a; border-radius: 8px; padding: 8px; box-sizing: border-box; box-shadow: 0 4px 15px rgba(0,0,0,0.35); }
+        .heatmap-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; width: 100%; }
+        @media (max-width: 850px) { .heatmap-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+        @media (max-width: 520px) { .heatmap-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+        .heat-tile { border-radius: 4px; padding: 3px 1px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; min-height: 38px; box-sizing: border-box; cursor: pointer; transition: all 0.2s ease; }
+        .heat-tile:hover { transform: translateY(-1px); }
+        .heat-tile.active-sector { outline: 2px solid #38bdf8; box-shadow: 0 0 10px rgba(56, 189, 248, 0.7) !important; }
+
+        .tile-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px; padding: 0 2px; }
+        .tile-name { font-size: 8px; font-weight: 800; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tile-rank { font-size: 6.5px; font-weight: 800; padding: 0 2px; border-radius: 2px; background: rgba(0, 0, 0, 0.4); color: #ffffff; }
+        .tile-price { font-size: 8.5px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: #ffffff; }
+        .tile-pct { font-size: 8px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+
+        .green-neon { color: #34d399; } .red-neon { color: #f87171; } .white-text { color: #ffffff; }
+        .vwap-above { color: #34d399; } .vwap-below { color: #f87171; }
     </style>
 </head>
 <body>
-
-    <header>
-        <h1>PRO TRADER TERMINAL</h1>
-        <div id="market-badge" class="market-status-badge closed">LOADING...</div>
-    </header>
-
-    <div id="error-banner"></div>
-
-    <!-- 1. INDIAN BENCHMARKS -->
-    <div class="section-title">1. Indian Broad Benchmarks</div>
-    <div class="grid-3">
-        <div class="card" id="card-NIFTY">
-            <div class="card-header"><span class="card-title">Nifty 50</span><span class="green">●</span></div>
-            <div class="card-ltp" id="val-NIFTY">0.00</div>
-            <div class="card-sub"><span id="ch-NIFTY">0.00</span><span id="chp-NIFTY">(0.00%)</span></div>
+    <div id="healthToast" class="health-toast">
+        <div id="healthToastHead" class="health-toast-head"></div>
+        <div id="healthToastBody" class="health-toast-body"></div>
+    </div>
+    <div class="header">
+        <div class="header-top">
+            <h1>PRO<span>TRADER</span> TERMINAL</h1>
+            <div class="header-right">
+                <div class="health-wrap">
+                    <div id="systemHealthBadge" class="health-badge" onclick="toggleHealthPanel()">
+                        <span id="healthIcon">●</span><span id="healthText">SYSTEM HEALTH CHECKING...</span>
+                    </div>
+                    <div id="healthPanel" class="health-panel">
+                        <div class="health-title">🛡️ SYSTEM HEALTH — LIVE MONITOR</div>
+                        <div id="healthRows"></div>
+                    </div>
+                </div>
+                <div class="live-pulse is-live"><span class="dot"></span><span>FEED ACTIVE</span></div>
+            </div>
         </div>
-        <div class="card" id="card-SENSEX">
-            <div class="card-header"><span class="card-title">Sensex</span><span class="green">●</span></div>
-            <div class="card-ltp" id="val-SENSEX">0.00</div>
-            <div class="card-sub"><span id="ch-SENSEX">0.00</span><span id="chp-SENSEX">(0.00%)</span></div>
-        </div>
-        <div class="card" id="card-BANKNIFTY">
-            <div class="card-header"><span class="card-title">Bank Nifty</span><span class="green">●</span></div>
-            <div class="card-ltp" id="val-BANKNIFTY">0.00</div>
-            <div class="card-sub"><span id="ch-BANKNIFTY">0.00</span><span id="chp-BANKNIFTY">(0.00%)</span></div>
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('home')">🏠 HOME</button>
+            <button class="tab-btn" onclick="switchTab('scanner')">🔍 SCANNER</button>
         </div>
     </div>
 
-    <!-- 2. GLOBAL MACRO -->
-    <div class="section-title">2. Global Macro (Spot + Futures)</div>
-    <div class="grid-3">
-        <div class="card">
-            <div class="card-header"><span class="card-title">Dow Jones</span><span class="red">●</span></div>
-            <div class="card-ltp" id="val-DOW">0.00</div>
-            <div class="card-sub"><span id="ch-DOW">0.00</span><span id="chp-DOW">0.00%</span></div>
+    <!-- HOME TAB -->
+    <div id="home" class="tab-content active">
+    
+    <!-- 1. INDIAN INDICES -->
+    <div class="section-header">
+        <div class="section-title">1. INDIAN BROAD BENCHMARKS</div>
+        <div class="live-tag" id="indianMarketBadge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid #ef4444;">● MARKET CLOSED</div>
+    </div>
+    <div class="top-indices-row" id="indianContainer"></div>
+
+    <!-- 2. GLOBAL MACRO (SPOT + FUTURES) -->
+    <div class="section-header"><div class="section-title">2. GLOBAL MACRO (SPOT + FUTURES)</div></div>
+    <div class="top-indices-row">
+        <!-- DOW JONES -->
+        <div class="index-box global-box">
+            <div class="index-header-row"><span class="mini-dot mini-dot-closed" id="dot-DOW"></span><span class="index-name">Dow Jones</span></div>
+            <div class="index-ltp white-text" id="ltp-DOW">--</div>
+            <div class="index-sub white-text" id="sub-DOW">--</div>
+            <div class="fut-badge-row">
+                <span class="fut-tag">FUT</span>
+                <span class="fut-val" id="fut-DOW">--</span>
+            </div>
         </div>
-        <div class="card">
-            <div class="card-header"><span class="card-title">Nasdaq</span><span class="red">●</span></div>
-            <div class="card-ltp" id="val-NASDAQ">0.00</div>
-            <div class="card-sub"><span id="ch-NASDAQ">0.00</span><span id="chp-NASDAQ">0.00%</span></div>
+        <!-- NASDAQ -->
+        <div class="index-box global-box">
+            <div class="index-header-row"><span class="mini-dot mini-dot-closed" id="dot-NASDAQ"></span><span class="index-name">Nasdaq</span></div>
+            <div class="index-ltp white-text" id="ltp-NASDAQ">--</div>
+            <div class="index-sub white-text" id="sub-NASDAQ">--</div>
+            <div class="fut-badge-row">
+                <span class="fut-tag">FUT</span>
+                <span class="fut-val" id="fut-NASDAQ">--</span>
+            </div>
         </div>
-        <div class="card">
-            <div class="card-header"><span class="card-title">S&P 500</span><span class="red">●</span></div>
-            <div class="card-ltp" id="val-SP500">0.00</div>
-            <div class="card-sub"><span id="ch-SP500">0.00</span><span id="chp-SP500">0.00%</span></div>
+        <!-- S&P 500 -->
+        <div class="index-box global-box">
+            <div class="index-header-row"><span class="mini-dot mini-dot-closed" id="dot-SP500"></span><span class="index-name">S&P 500</span></div>
+            <div class="index-ltp white-text" id="ltp-SP500">--</div>
+            <div class="index-sub white-text" id="sub-SP500">--</div>
+            <div class="fut-badge-row">
+                <span class="fut-tag">US</span>
+                <span class="fut-val" style="font-size:10px;">CASH</span>
+            </div>
         </div>
-        <div class="card">
-            <div class="card-header"><span class="card-title">Nikkei 225</span><span class="red">●</span></div>
-            <div class="card-ltp" id="val-NIKKEI">0.00</div>
-            <div class="card-sub"><span id="ch-NIKKEI">0.00</span><span id="chp-NIKKEI">0.00%</span></div>
+        <!-- NIKKEI 225 -->
+        <div class="index-box global-box">
+            <div class="index-header-row"><span class="mini-dot mini-dot-closed" id="dot-NIKKEI"></span><span class="index-name">Nikkei 225</span></div>
+            <div class="index-ltp white-text" id="ltp-NIKKEI">--</div>
+            <div class="index-sub white-text" id="sub-NIKKEI">--</div>
+            <div class="fut-badge-row">
+                <span class="fut-tag">FUT</span>
+                <span class="fut-val" id="fut-NIKKEI">--</span>
+            </div>
         </div>
-        <div class="card">
-            <div class="card-header"><span class="card-title">Crude Oil</span><span class="green">●</span></div>
-            <div class="card-ltp" id="val-CRUDE">0.00</div>
-            <div class="card-sub"><span id="ch-CRUDE">0.00</span><span id="chp-CRUDE">0.00%</span></div>
+        <!-- OIL -->
+        <div class="index-box global-box" style="padding: 6px 3px;">
+            <div class="index-header-row" style="margin-bottom: 2px;"><span class="mini-dot mini-dot-live" id="dot-OIL"></span><span class="index-name">Oil (WTI/BRN)</span></div>
+            <div class="split-row"><span class="split-label">WTI</span><div style="text-align:right;"><div class="split-ltp white-text" id="ltp-CRUDE">--</div><div class="split-sub white-text" id="sub-CRUDE">--</div></div></div>
+            <div class="split-line"></div>
+            <div class="split-row"><span class="split-label">BRN</span><div style="text-align:right;"><div class="split-ltp white-text" id="ltp-BRENT">--</div><div class="split-sub white-text" id="sub-BRENT">--</div></div></div>
         </div>
-        <div class="card">
-            <div class="card-header"><span class="card-title">Gold MCX</span><span class="green">●</span></div>
-            <div class="card-ltp" id="val-GOLD_MCX">0.00</div>
-            <div class="card-sub"><span id="ch-GOLD_MCX">0.00</span><span id="chp-GOLD_MCX">0.00%</span></div>
+        <!-- GOLD -->
+        <div class="index-box global-box" style="padding: 6px 3px;">
+            <div class="index-header-row" style="margin-bottom: 2px;"><span class="mini-dot mini-dot-live" id="dot-GOLD"></span><span class="index-name">Gold (Spot/MCX)</span></div>
+            <div class="split-row"><span class="split-label">USD</span><div style="text-align:right;"><div class="split-ltp white-text" id="ltp-XAUUSD">--</div><div class="split-sub white-text" id="sub-XAUUSD">--</div></div></div>
+            <div class="split-line"></div>
+            <div class="split-row"><span class="split-label">INR</span><div style="text-align:right;"><div class="split-ltp white-text" id="ltp-GOLD_MCX">--</div><div class="split-sub white-text" id="sub-GOLD_MCX">--</div></div></div>
         </div>
     </div>
 
     <!-- 3. OTHER GLOBAL MARKETS -->
-    <div class="section-title">3. Other Global Markets</div>
-    <div class="other-global-grid" id="other-global-container">
-        <!-- Populated via JS -->
+    <div class="section-header"><div class="section-title">3. OTHER GLOBAL MARKETS</div></div>
+    <div class="ticker-wrap"><div class="ticker-move" id="tickerContainer"></div></div>
+
+    <!-- 4. NSE SECTORAL HEATMAP -->
+    <div class="section-header"><div class="section-title">4. NSE SECTORAL HEATMAP (23 SECTORS)</div></div>
+    <div class="heatmap-box">
+        <div class="heatmap-grid" id="heatmapContainerTop" style="margin-bottom: 4px;"></div>
+        <div class="heatmap-grid" id="heatmapContainerBottom"></div>
+    </div>
     </div>
 
-    <!-- 4. SECTORAL HEATMAP -->
-    <div class="section-title">4. NSE Sectoral Heatmap</div>
-    <div class="sector-grid" id="sector-container">
-        <!-- Populated via JS -->
+    <!-- SCANNER TAB -->
+    <div id="scanner" class="tab-content">
     </div>
 
     <script>
-        async function updateData() {
-            try {
-                let resSpots = await fetch('/api/spots');
-                let dataSpots = await resSpots.json();
-                if(dataSpots.status === 'success') {
-                    let badge = document.getElementById('market-badge');
-                    if(dataSpots.is_market_live) {
-                        badge.className = 'market-status-badge live';
-                        badge.innerText = 'MARKET LIVE';
-                    } else {
-                        badge.className = 'market-status-badge closed';
-                        badge.innerText = 'MARKET CLOSED';
-                    }
+        const indianList = [
+            {id: "NIFTY", name: "Nifty 50"},
+            {id: "SENSEX", name: "Sensex"},
+            {id: "BANKNIFTY", name: "Bank Nifty"},
+        ];
 
-                    for(let [sym, val] of Object.entries(dataSpots.data)) {
-                        let elVal = document.getElementById(`val-${sym}`);
-                        let elCh = document.getElementById(`ch-${sym}`);
-                        let elChp = document.getElementById(`chp-${sym}`);
-                        if(elVal) elVal.innerText = val.ltp.toLocaleString('en-IN');
-                        if(elCh) {
-                            elCh.innerText = (val.ch >= 0 ? '+' : '') + val.ch.toFixed(2);
-                            elCh.className = val.ch >= 0 ? 'green' : 'red';
-                        }
-                        if(elChp) {
-                            elChp.innerText = `(${(val.chp >= 0 ? '+' : '') + val.chp.toFixed(2)}%)`;
-                            elChp.className = val.chp >= 0 ? 'green' : 'red';
-                        }
-                    }
+        function buildIndianBoxes() {
+            let html = "";
+            for (let item of indianList) {
+                html += `
+                <div class="index-box">
+                    <div class="index-header-row">
+                        <span class="mini-dot mini-dot-closed" id="dot-${item.id}" style="background-color: #ef4444; box-shadow: 0 0 10px #ef4444; animation: feedRedPulse 1.2s infinite ease-in-out;"></span>
+                        <span class="index-name">${item.name}</span>
+                    </div>
+                    <div class="index-ltp white-text" id="ltp-${item.id}">--</div>
+                    <div class="index-sub white-text" id="sub-${item.id}">--</div>
+                </div>`;
+            }
+            document.getElementById('indianContainer').innerHTML = html;
+        }
+        buildIndianBoxes();
+
+        const tickerSymbols = ["HANGSENG", "FTSE", "DAX", "CAC", "KOSPI", "SHANGHAI", "BTC"];
+        const tickerNames = {"HANGSENG":"Hang Seng", "FTSE":"FTSE 100", "DAX":"DAX Germany", "CAC":"CAC 40", "KOSPI":"KOSPI", "SHANGHAI":"Shanghai", "BTC":"Bitcoin"};
+        
+        function buildTicker() {
+            let html = "";
+            for(let sym of tickerSymbols) {
+                html += `
+                <div class="ticker-item">
+                    <div class="ticker-item-left">
+                        <span class="mini-dot mini-dot-closed" id="tdot-${sym}"></span>
+                        <span class="ticker-name">${tickerNames[sym]}</span>
+                    </div>
+                    <div class="ticker-item-right">
+                        <span class="ticker-val white-text" id="tick-${sym}">--</span>
+                        <span class="ticker-sub white-text" id="tsub-${sym}">--</span>
+                    </div>
+                </div>`;
+            }
+            document.getElementById('tickerContainer').innerHTML = html;
+        }
+        buildTicker();
+
+        function checkMarketLive(sym) {
+            let now = new Date();
+            let utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+            let ist = new Date(utcMs + (5.5 * 3600000));
+            let day = ist.getDay();
+            let hours = ist.getHours() + (ist.getMinutes() / 60);
+
+            if (sym === "BTC") return true;
+            if (day === 0 || day === 6) return false;
+
+            if (["NIFTY", "BANKNIFTY", "SENSEX"].includes(sym)) {
+                return (hours >= 9.25 && hours <= 15.5);
+            }
+            if (sym === "KOSPI") return (hours >= 5.5 && hours <= 12.0);
+            if (sym === "SHANGHAI" || sym === "HANGSENG") return (hours >= 7.0 && hours <= 13.5);
+            if (["FTSE", "DAX", "CAC"].includes(sym)) return (hours >= 13.5 && hours <= 22.0);
+            if (["OIL", "GOLD", "CRUDE", "BRENT", "XAUUSD", "GOLD_MCX"].includes(sym)) {
+                return (day >= 1 && day <= 5);
+            }
+            return false;
+        }
+
+        function getGlobalMarketState(sym) {
+            let now = new Date();
+            let utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+            let ist = new Date(utcMs + (5.5 * 3600000));
+            let day = ist.getDay(); 
+            let hours = ist.getHours() + (ist.getMinutes() / 60);
+
+            if (sym === "DOW") {
+                if (day === 0) {
+                    return hours >= 21.0 ? "FUTURES" : "CLOSED";
                 }
-
-                let globals = ['DOW', 'NASDAQ', 'SP500', 'NIKKEI', 'CRUDE', 'GOLD_MCX', 'HANGSENG', 'FTSE', 'DAX', 'CAC', 'KOSPI', 'SHANGHAI', 'BRENT'];
-                for(let sym of globals) {
-                    try {
-                        let resG = await fetch(`/api/global?symbol=${sym}`);
-                        let d = await resG.json();
-                        let elVal = document.getElementById(`val-${sym}`);
-                        if(elVal && d.ltp) {
-                            elVal.innerText = d.ltp.toLocaleString();
-                            let parent = elVal.parentElement;
-                            let subCh = parent.querySelector('.card-sub span:first-child');
-                            let subChp = parent.querySelector('.card-sub span:last-child');
-                            if(subCh) {
-                                subCh.innerText = (d.ch >= 0 ? '+' : '') + (d.ch || 0).toFixed(2);
-                                subCh.className = (d.ch >= 0 ? 'green' : 'red');
-                            }
-                            if(subChp) {
-                                subChp.innerText = `${(d.chp >= 0 ? '+' : '') + (d.chp || 0).toFixed(2)}%`;
-                                subChp.className = (d.chp >= 0 ? 'green' : 'red');
-                            }
-                        }
-                    } catch(e){}
+                if (day === 6) {
+                    return hours <= 2.0 ? "MAIN_LIVE" : "CLOSED";
                 }
-
-                let otherGlobals = [
-                    {name: 'Hang Seng', sym: 'HANGSENG'},
-                    {name: 'FTSE 100', sym: 'FTSE'},
-                    {name: 'DAX', sym: 'DAX'},
-                    {name: 'CAC 40', sym: 'CAC'},
-                    {name: 'KOSPI', sym: 'KOSPI'},
-                    {name: 'Shanghai', sym: 'SHANGHAI'},
-                    {name: 'Brent Crude', sym: 'BRENT'}
-                ];
-                let otherHtml = '';
-                for(let item of otherGlobals) {
-                    try {
-                        let resOG = await fetch(`/api/global?symbol=${item.sym}`);
-                        let d = await resOG.json();
-                        let color = (d.chp >= 0) ? 'green' : 'red';
-                        otherHtml += `
-                            <div class="mini-card">
-                                <div class="mini-name" title="${item.name}">${item.name}</div>
-                                <div class="mini-val">
-                                    <div style="font-weight:700;">${d.ltp ? d.ltp.toLocaleString() : '0.00'}</div>
-                                    <div class="${color}" style="font-size:0.65rem;">${(d.chp >= 0 ? '+' : '') + (d.chp || 0).toFixed(2)}%</div>
-                                </div>
-                            </div>
-                        `;
-                    } catch(e){}
+                if (hours >= 19.0 || hours <= 2.0) {
+                    return "MAIN_LIVE";
                 }
-                document.getElementById('other-global-container').innerHTML = otherHtml;
-
-                let resSec = await fetch('/api/sectors');
-                let sectors = await resSec.json();
-                let secHtml = '';
-                for(let sec of sectors) {
-                    let color = sec.chp >= 0 ? 'green' : 'red';
-                    secHtml += `
-                        <div class="sector-card">
-                            <div class="sector-name">${sec.name}</div>
-                            <div class="sector-data">
-                                <span>${sec.ltp.toLocaleString('en-IN')}</span>
-                                <span class="${color}">${(sec.chp >= 0 ? '+' : '') + sec.chp.toFixed(2)}%</span>
-                            </div>
-                        </div>
-                    `;
+                if (hours >= 3.5 && hours < 19.0) {
+                    return "FUTURES";
                 }
-                document.getElementById('sector-container').innerHTML = secHtml;
+                return "CLOSED";
+            }
 
-            } catch (err) {
-                console.error("Polling error:", err);
+            if (["NASDAQ", "SP500"].includes(sym)) {
+                if (day === 0 || day === 6) {
+                    if (day === 6 && hours <= 2.0) return "MAIN_LIVE";
+                    return "CLOSED";
+                }
+                return (hours >= 19.0 || hours <= 2.0) ? "MAIN_LIVE" : "CLOSED";
+            }
+
+            if (sym === "NIKKEI") {
+                if (day >= 5) return "CLOSED";
+                return (hours >= 5.5 && hours <= 12.0) ? "MAIN_LIVE" : "CLOSED";
+            }
+
+            return checkMarketLive(sym) ? "MAIN_LIVE" : "CLOSED";
+        }
+
+        function updateMarketDot(dotId, sym) {
+            let el = document.getElementById(dotId);
+            if (!el) return;
+            let state = getGlobalMarketState(sym);
+            if (state === "MAIN_LIVE") {
+                el.className = "mini-dot mini-dot-live";
+                el.style.backgroundColor = "#10b981";
+                el.style.boxShadow = "0 0 10px #10b981";
+                el.style.animation = "feedBlinkPulse 1.2s infinite ease-in-out";
+            } else if (state === "FUTURES") {
+                el.className = "mini-dot mini-dot-futures";
+                el.style.backgroundColor = "#f59e0b";
+                el.style.boxShadow = "0 0 10px #f59e0b";
+                el.style.animation = "feedAmberPulse 1.4s infinite ease-in-out";
+            } else {
+                el.className = "mini-dot mini-dot-closed";
+                el.style.backgroundColor = "#ef4444";
+                el.style.boxShadow = "0 0 10px #ef4444";
+                el.style.animation = "feedRedPulse 1.2s infinite ease-in-out";
             }
         }
 
-        setInterval(updateData, 3000);
-        updateData();
+        function updateDotStatus(dotId, isLive) {
+            let el = document.getElementById(dotId);
+            if (!el) return;
+            if (isLive) {
+                el.className = "mini-dot mini-dot-live";
+                el.style.backgroundColor = "#10b981";
+                el.style.boxShadow = "0 0 10px #10b981";
+                el.style.animation = "feedBlinkPulse 1.2s infinite ease-in-out";
+            } else {
+                el.className = "mini-dot mini-dot-closed";
+                el.style.backgroundColor = "#ef4444";
+                el.style.boxShadow = "0 0 10px #ef4444";
+                el.style.animation = "feedRedPulse 1.2s infinite ease-in-out";
+            }
+        }
+
+        function updateElement(ltpId, subId, ltpVal, chVal, chpVal, prefixType="none") {
+            let elLtp = document.getElementById(ltpId);
+            let elSub = document.getElementById(subId);
+            if(!elLtp || !elSub) return;
+
+            let prefix = prefixType === "usd" ? "$" : (prefixType === "inr" ? "₹" : "");
+            elLtp.innerText = prefix + Number(ltpVal).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            let sign = chVal >= 0 ? "+" : "";
+            elSub.innerText = `${sign}${Number(chVal).toFixed(2)} (${sign}${Number(chpVal).toFixed(2)}%)`;
+
+            let colorClass = chVal >= 0 ? "green-neon" : "red-neon";
+            elLtp.className = elLtp.className.replace(/green-neon|red-neon|white-text/g, '') + " " + colorClass;
+            elSub.className = elSub.className.replace(/green-neon|red-neon|white-text/g, '') + " " + colorClass;
+        }
+
+        async function fetchIndianData() {
+            try {
+                const res = await fetch('/api/spots');
+                const payload = await res.json();
+                
+                let isLive = (payload && payload.is_market_live !== undefined) ? payload.is_market_live : checkMarketLive("NIFTY");
+
+                let badge = document.getElementById("indianMarketBadge");
+                if (badge) {
+                    badge.style.borderColor = isLive ? "#10b981" : "#ef4444";
+                    badge.style.color = isLive ? "#34d399" : "#f87171";
+                    badge.style.background = isLive ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)";
+                    badge.innerHTML = isLive ? "● MARKET LIVE" : "● MARKET CLOSED";
+                }
+
+                indianList.forEach(item => {
+                    updateDotStatus(`dot-${item.id}`, isLive);
+                });
+
+                if (payload && payload.status === "success" && payload.data) {
+                    indianList.forEach(item => {
+                        let sym = item.id;
+                        let d = payload.data[sym];
+                        if (d && d.ltp !== undefined && d.ltp > 0) {
+                            updateElement(`ltp-${sym}`, `sub-${sym}`, d.ltp, d.ch, d.chp);
+                        }
+                    });
+                }
+            } catch (e) {}
+        }
+
+        async function fetchSectorData() {
+            try {
+                let res = await fetch('/api/sectors');
+                let allSectors = await res.json();
+                if (!Array.isArray(allSectors) || allSectors.length === 0) return;
+
+                allSectors.sort((a, b) => b.chp - a.chp);
+                let top12 = allSectors.slice(0, 12);
+                let bottom12 = allSectors.slice(12, 23);
+
+                let renderTiles = (list, startIndex) => {
+                    let html = '';
+                    list.forEach((item, idx) => {
+                        let index = startIndex + idx;
+                        let chp = Number(item.chp) || 0;
+                        let isPositive = chp >= 0;
+                        let absVal = Math.abs(chp);
+                        let alpha = Math.min(Math.max(absVal / 2.5, 0.12), 0.38);
+                        let bgColor = isPositive ? `rgba(16, 185, 129, ${alpha})` : `rgba(239, 68, 68, ${alpha})`;
+                        let borderColor = isPositive ? `rgba(16, 185, 129, 0.7)` : `rgba(239, 68, 68, 0.7)`;
+                        let shadowColor = isPositive ? `rgba(16, 185, 129, 0.2)` : `rgba(239, 68, 68, 0.2)`;
+                        let textColor = isPositive ? 'green-neon' : 'red-neon';
+                        let sign = isPositive ? '+' : '';
+                        html += `
+                        <div class="heat-tile" style="background-color: ${bgColor}; border: 1px solid ${borderColor}; box-shadow: 0 0 8px ${shadowColor}; min-height: 38px;">
+                            <div class="tile-header"><span class="tile-name">${item.name}</span><span class="tile-rank">#${index + 1}</span></div>
+                            <div class="tile-price">${Number(item.ltp).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 1})}</div>
+                            <div class="tile-pct ${textColor}">${sign}${chp.toFixed(2)}%</div>
+                        </div>`;
+                    });
+                    return html;
+                };
+
+                document.getElementById('heatmapContainerTop').innerHTML = renderTiles(top12, 0);
+                document.getElementById('heatmapContainerBottom').innerHTML = renderTiles(bottom12, 12);
+            } catch (e) {}
+        }
+
+        async function fetchGlobalData() {
+            const globals = ["DOW", "NASDAQ", "SP500", "CRUDE", "BRENT", "XAUUSD", "GOLD_MCX", "NIKKEI", "HANGSENG"];
+            try {
+                const results = await Promise.allSettled(
+                    globals.map(sym => fetch(`/api/global?symbol=${sym}`).then(r => r.json()))
+                );
+                results.forEach((res, i) => {
+                    let symbol = globals[i];
+                    
+                    if (["DOW", "NASDAQ", "SP500", "NIKKEI"].includes(symbol)) {
+                        updateMarketDot(`dot-${symbol}`, symbol);
+                    } else if (["CRUDE", "BRENT"].includes(symbol)) {
+                        updateDotStatus(`dot-OIL`, checkMarketLive(symbol));
+                    } else if (["XAUUSD", "GOLD_MCX"].includes(symbol)) {
+                        updateDotStatus(`dot-GOLD`, checkMarketLive(symbol));
+                    } else {
+                        updateDotStatus(`dot-${symbol}`, checkMarketLive(symbol));
+                    }
+
+                    if (res.status === "fulfilled" && res.value && res.value.ltp !== undefined) {
+                        let prefixType = (symbol === "XAUUSD" || symbol === "CRUDE" || symbol === "BRENT") ? "usd" : (symbol === "GOLD_MCX" ? "inr" : "none");
+                        updateElement(`ltp-${symbol}`, `sub-${symbol}`, res.value.ltp, res.value.ch, res.value.chp, prefixType);
+
+                        let elFut = document.getElementById(`fut-${symbol}`);
+                        if (elFut && res.value.fut) {
+                            elFut.innerText = Number(res.value.fut).toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+                        }
+                    }
+                });
+
+                const tickResults = await Promise.allSettled(
+                    tickerSymbols.map(sym => fetch(`/api/global?symbol=${sym}`).then(r => r.json()))
+                );
+                tickResults.forEach((res, i) => {
+                    let sym = tickerSymbols[i];
+                    updateDotStatus(`tdot-${sym}`, checkMarketLive(sym));
+
+                    if (res.status === "fulfilled" && res.value && res.value.ltp !== undefined) {
+                        let t1 = document.getElementById(`tick-${sym}`);
+                        let sub1 = document.getElementById(`tsub-${sym}`);
+                        let valStr = Number(res.value.ltp).toLocaleString('en-US');
+                        let sign = res.value.ch >= 0 ? "+" : "";
+                        let subStr = `${sign}${Number(res.value.chp).toFixed(2)}%`;
+                        let colorClass = res.value.ch >= 0 ? "green-neon" : "red-neon";
+
+                        if(t1) { t1.innerText = valStr; t1.className = "ticker-val " + colorClass; }
+                        if(sub1) { sub1.innerText = subStr; sub1.className = "ticker-sub " + colorClass; }
+                    }
+                });
+            } catch (e) {}
+        }
+
+        // ---------------- SYSTEM HEALTH AUTO MONITOR ----------------
+        let lastHealthSignature = null;
+        let lastHealthStatus = "UNKNOWN";
+        let healthToastTimer = null;
+        let frontendErrors = [];
+
+        function showHealthToast(type, head, body) {
+            const toast = document.getElementById("healthToast");
+            const h = document.getElementById("healthToastHead");
+            const b = document.getElementById("healthToastBody");
+            if (!toast || !h || !b) return;
+            toast.className = "health-toast show " + type;
+            h.innerText = head;
+            b.innerText = body;
+            clearTimeout(healthToastTimer);
+            healthToastTimer = setTimeout(() => toast.classList.remove("show"), 7000);
+        }
+
+        function toggleHealthPanel() {
+            const p = document.getElementById("healthPanel");
+            if (p) p.classList.toggle("show");
+        }
+
+        function healthStateLabel(status) {
+            return status === "OK" ? "OK" : status === "WARNING" ? "WARNING" : status === "ERROR" ? "ERROR" : "CHECKING";
+        }
+
+        function renderHealth(payload) {
+            if (!payload || !payload.checks) return;
+            const badge = document.getElementById("systemHealthBadge");
+            const icon = document.getElementById("healthIcon");
+            const text = document.getElementById("healthText");
+            const rows = document.getElementById("healthRows");
+            const status = payload.status || "UNKNOWN";
+
+            badge.className = "health-badge" + (status === "WARNING" ? " warning" : status === "ERROR" ? " error" : "");
+            icon.innerText = status === "OK" ? "●" : status === "WARNING" ? "▲" : status === "ERROR" ? "✖" : "•";
+            text.innerText = status === "OK" ? "SYSTEM HEALTHY" : status === "WARNING" ? "SYSTEM WARNING" : status === "ERROR" ? "SYSTEM ERROR" : "SYSTEM CHECKING...";
+
+            const entries = Object.entries(payload.checks);
+            rows.innerHTML = entries.map(([source, x]) => {
+                const cls = x.status === "OK" ? "health-ok" : x.status === "WARNING" ? "health-warning" : x.status === "ERROR" ? "health-error" : "";
+                const age = x.last_success ? Math.max(0, Math.floor(Date.now()/1000 - x.last_success)) + "s ago" : "no success yet";
+                const detail = x.last_error ? `${x.last_error} — ${x.action || "Check source."}` : (x.action || "Working normally.");
+                return `<div class="health-row"><div class="health-source">${source.toUpperCase()}</div><div class="health-state ${cls}">${healthStateLabel(x.status)}</div><div class="health-detail"><b>${age}</b><br>${detail}</div></div>`;
+            }).join("");
+
+            const signature = entries.map(([k,v]) => `${k}:${v.status}:${v.last_error || ""}`).join("|");
+            if (lastHealthSignature !== null && signature !== lastHealthSignature) {
+                if (status === "ERROR") {
+                    const bad = entries.find(([,v]) => v.status === "ERROR");
+                    showHealthToast("error", "🔴 SYSTEM ERROR", `${bad[0].toUpperCase()}: ${bad[1].last_error || "request failed"}. ${bad[1].action || "Check connection."}`);
+                } else if (status === "WARNING") {
+                    const bad = entries.find(([,v]) => v.status === "WARNING");
+                    showHealthToast("warning", "🟡 SYSTEM WARNING", `${bad[0].toUpperCase()}: ${bad[1].last_error || "data may be stale"}. ${bad[1].action || "Check the source."}`);
+                } else if (status === "OK" && lastHealthStatus !== "OK") {
+                    showHealthToast("resolved", "🟢 SYSTEM HEALTHY", "All monitored data sources are working normally again.");
+                }
+            }
+            lastHealthSignature = signature;
+            lastHealthStatus = status;
+        }
+
+        async function checkSystemHealth() {
+            try {
+                const r = await fetch('/api/health', {cache:'no-store'});
+                if (!r.ok) throw new Error(`Health API HTTP ${r.status}`);
+                renderHealth(await r.json());
+            } catch (e) {
+                const badge = document.getElementById("systemHealthBadge");
+                const icon = document.getElementById("healthIcon");
+                const text = document.getElementById("healthText");
+                if (badge) badge.className = "health-badge error";
+                if (icon) icon.innerText = "✖";
+                if (text) text.innerText = "SYSTEM ERROR";
+                const sig = "frontend-health-api:" + String(e);
+                if (lastHealthSignature !== sig) {
+                    showHealthToast("error", "🔴 SYSTEM ERROR", "Backend health monitor unreachable. Check whether the FastAPI server is running.");
+                    lastHealthSignature = sig;
+                }
+            }
+        }
+
+        window.addEventListener('error', function(e) {
+            const msg = e.message || 'Frontend error';
+            frontendErrors.push(msg);
+            frontendErrors = frontendErrors.slice(-5);
+            showHealthToast("error", "🔴 PAGE ERROR", msg);
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            const msg = e.reason && e.reason.message ? e.reason.message : String(e.reason || 'Unhandled promise error');
+            frontendErrors.push(msg);
+            frontendErrors = frontendErrors.slice(-5);
+            showHealthToast("error", "🔴 PAGE ERROR", msg);
+        });
+
+        function switchTab(tabName) {
+            const tabs = document.querySelectorAll('.tab-content');
+            const btns = document.querySelectorAll('.tab-btn');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            btns.forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        fetchIndianData(); fetchGlobalData(); fetchSectorData();
+        checkSystemHealth();
+        setInterval(fetchIndianData, 2000);   
+        setInterval(fetchSectorData, 3000);   
+        setInterval(fetchGlobalData, 4000);
+        setInterval(checkSystemHealth, 7000);
     </script>
 </body>
 </html>
