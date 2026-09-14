@@ -1,4 +1,6 @@
 import time
+import json
+from pathlib import Path
 from fastapi import APIRouter
 
 router = APIRouter()
@@ -7,6 +9,18 @@ GLOBAL_CACHE = {
     "SP500": {"symbol": "SP500", "ltp": 5850.00, "ch": 25.50, "chp": 0.44, "market_status": "RED"},
     "NIKKEI": {"symbol": "NIKKEI", "ltp": 0.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
 }
+
+def load_cache_safely():
+    try:
+        cache_file = Path(__file__).parent / "market_cache.json"
+        if cache_file.exists():
+            with open(cache_file, "r", encoding="utf-8") as f:
+                p_data = json.load(f)
+                if "global" in p_data:
+                    return p_data["global"]
+    except Exception:
+        pass
+    return {}
 
 def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_func, health_ok_func, health_fail_func):
     headers = {
@@ -35,6 +49,10 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
             health_ok_func("tradingview")
             data = r.json()
             if data and data.get("data"):
+                persisted_global = load_cache_safely()
+                for k, v in persisted_global.items():
+                    GLOBAL_CACHE[k] = v
+
                 for row in data.get("data", []):
                     s = row.get("s")
                     vals = row.get("d", [])
@@ -54,7 +72,7 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
                                 item_data = {"ltp": round(p, 2), "ch": round(ch, 2), "chp": chp}
                             GLOBAL_CACHE["SP500"] = {**item_data, "symbol": "SP500", "market_status": "RED"}
                         elif "NI225" in s: GLOBAL_CACHE["NIKKEI"] = {**item_data, "symbol": "NIKKEI", "market_status": "RED"}
-                        elif "CL1!" in s: GLOBAL_CACHE["CRUDE"] = {**item_data, "symbol": "CRUDE", "market_status": "RED"}
+                        elif "CL1!" in s: GLOBAL_CACHE["WTI_CRUDE"] = {**item_data, "symbol": "WTI_CRUDE", "market_status": "RED"}
                         elif "BZ1!" in s: GLOBAL_CACHE["BRENT"] = {**item_data, "symbol": "BRENT", "market_status": "RED"}
                         elif "GOLD" in s:
                             if p < 5000:
@@ -72,24 +90,33 @@ def get_global(symbol: str):
     if sym in ["SNP500", "SPX"]:
         sym = "SP500"
     
+    # Load latest from persistent cache to ensure MCX and USD values are always present
+    cached_global = load_cache_safely()
+    for k, v in cached_global.items():
+        GLOBAL_CACHE[k] = v
+
     if sym in ["GOLD", "XAUUSD"]:
         xau = GLOBAL_CACHE.get("XAUUSD", {"ltp": 0, "ch": 0, "chp": 0})
+        mcx = GLOBAL_CACHE.get("GOLD_MCX", {"ltp": 0, "ch": 0, "chp": 0})
         return {
             "symbol": "GOLD",
             "ltp": xau.get("ltp", 0),
             "ch": xau.get("ch", 0),
             "chp": xau.get("chp", 0),
+            "inr": mcx.get("ltp", 0),
+            "inr_ch": mcx.get("ch", 0),
+            "inr_chp": mcx.get("chp", 0),
             "market_status": "RED"
         }
 
     if sym in ["OIL", "CRUDE", "BRENT"]:
-        crude = GLOBAL_CACHE.get("CRUDE", {"ltp": 0, "ch": 0, "chp": 0})
+        mcx_crude = GLOBAL_CACHE.get("CRUDE_MCX", {"ltp": 0, "ch": 0, "chp": 0})
         brent = GLOBAL_CACHE.get("BRENT", {"ltp": 0, "ch": 0, "chp": 0})
         return {
             "symbol": "OIL",
-            "ltp": crude.get("ltp", 0),
-            "ch": crude.get("ch", 0),
-            "chp": crude.get("chp", 0),
+            "ltp": mcx_crude.get("ltp", 0),
+            "ch": mcx_crude.get("ch", 0),
+            "chp": mcx_crude.get("chp", 0),
             "brent_ltp": brent.get("ltp", 0),
             "brent_ch": brent.get("ch", 0),
             "brent_chp": brent.get("chp", 0),
