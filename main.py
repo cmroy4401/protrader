@@ -12,7 +12,6 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from config import ACCESS_TOKEN
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -22,7 +21,6 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 app = FastAPI(title="PRO TRADER - Live Terminal")
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -34,13 +32,11 @@ app.add_middleware(
 STATIC_DIR = Path(__file__).parent / "static" if (Path(__file__).parent / "static").exists() else Path(__file__).parent
 CACHE_FILE = Path(__file__).parent / "market_cache.json"
 
-# API Configuration constants
 API_TIMEOUT = 3.5
 REQUEST_RETRY_COUNT = 2
 MIN_REQUEST_INTERVAL = 0.2
 BACKGROUND_FETCH_INTERVAL = 10
 
-# Initialize cache dictionary
 _cache = {
     "indices_data": {},
     "indices_time": 0,
@@ -48,7 +44,6 @@ _cache = {
     "sectors_time": 0
 }
 
-# Create session with retry strategy
 def create_session():
     s = requests.Session()
     retry = Retry(
@@ -153,13 +148,12 @@ def is_indian_market_open():
 def is_cache_valid(cache_time, cache_duration):
     return time.time() - cache_time < cache_duration
 
-# Added MCX Crude Oil key along with Gold and Indices
 INDICES_KEYS = [
     "NSE_INDEX|Nifty 50",
     "NSE_INDEX|Nifty Bank",
     "BSE_INDEX|SENSEX",
     "MCX_FO|483079",
-    "MCX_FO|426554"  # MCX Crude Oil Instrument Key (Standard active contract)
+    "MCX_FO|426554"
 ]
 
 SECTOR_MAPPING = {
@@ -299,7 +293,6 @@ def fetch_upstox_indices():
                     if ltp > 0:
                         indices_parsed["SENSEX"] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2), "market_status": "GREEN"}
 
-                # Capture Gold & Crude Oil from Upstox raw data
                 for k, v in raw.items():
                     if "483079" in k or "gold" in k.lower():
                         g_ltp = float(v.get('last_price', 0) or 0)
@@ -478,7 +471,6 @@ def get_global(symbol: str):
     if sym in ["SNP500", "SPX"]:
         sym = "SP500"
     
-    # Combined response for Gold (USD + INR MCX)
     if sym in ["GOLD", "XAUUSD"]:
         xau = GLOBAL_CACHE.get("XAUUSD", {"ltp": 0, "ch": 0, "chp": 0})
         mcx = GLOBAL_CACHE.get("GOLD_MCX", {"ltp": 0, "ch": 0, "chp": 0})
@@ -493,16 +485,15 @@ def get_global(symbol: str):
             "market_status": "RED"
         }
 
-    # Combined response for Oil (WTI/Crude from MCX + Brent from TradingView)
     if sym in ["OIL", "CRUDE"]:
         mcx_crude = GLOBAL_CACHE.get("CRUDE_MCX", {"ltp": 0, "ch": 0, "chp": 0})
         brent = GLOBAL_CACHE.get("BRENT", {"ltp": 0, "ch": 0, "chp": 0})
         return {
             "symbol": "OIL",
-            "ltp": mcx_crude.get("ltp", 0),       # MCX Crude Price in INR
+            "ltp": mcx_crude.get("ltp", 0),
             "ch": mcx_crude.get("ch", 0),
             "chp": mcx_crude.get("chp", 0),
-            "brent_ltp": brent.get("ltp", 0),     # Brent Price in USD
+            "brent_ltp": brent.get("ltp", 0),
             "brent_ch": brent.get("ch", 0),
             "brent_chp": brent.get("chp", 0),
             "market_status": "RED"

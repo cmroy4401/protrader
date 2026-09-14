@@ -226,10 +226,10 @@
                 <span class="fut-val" id="fut-NIKKEI">--</span>
             </div>
         </div>
-        <!-- OIL -->
+        <!-- OIL (MCX + BRENT) -->
         <div class="index-box global-box" style="padding: 6px 3px;">
-            <div class="index-header-row" style="margin-bottom: 2px;"><span class="mini-dot mini-dot-live" id="dot-OIL"></span><span class="index-name">Oil (WTI/BRN)</span></div>
-            <div class="split-row"><span class="split-label">WTI</span><div style="text-align:right;"><div class="split-ltp white-text" id="ltp-CRUDE">--</div><div class="split-sub white-text" id="sub-CRUDE">--</div></div></div>
+            <div class="index-header-row" style="margin-bottom: 2px;"><span class="mini-dot mini-dot-live" id="dot-OIL"></span><span class="index-name">Oil (MCX/BRN)</span></div>
+            <div class="split-row"><span class="split-label">MCX</span><div style="text-align:right;"><div class="split-ltp white-text" id="ltp-OIL">--</div><div class="split-sub white-text" id="sub-OIL">--</div></div></div>
             <div class="split-line"></div>
             <div class="split-row"><span class="split-label">BRN</span><div style="text-align:right;"><div class="split-ltp white-text" id="ltp-BRENT">--</div><div class="split-sub white-text" id="sub-BRENT">--</div></div></div>
         </div>
@@ -488,7 +488,7 @@
         }
 
         async function fetchGlobalData() {
-            const globals = ["DOW", "NASDAQ", "SP500", "CRUDE", "BRENT", "XAUUSD", "GOLD_MCX", "NIKKEI", "HANGSENG"];
+            const globals = ["DOW", "NASDAQ", "SP500", "OIL", "BRENT", "XAUUSD", "GOLD_MCX", "NIKKEI", "HANGSENG"];
             try {
                 const results = await Promise.allSettled(
                     globals.map(sym => fetch(`/api/global?symbol=${sym}`).then(r => r.json()))
@@ -498,21 +498,30 @@
                     
                     if (["DOW", "NASDAQ", "SP500", "NIKKEI"].includes(symbol)) {
                         updateMarketDot(`dot-${symbol}`, symbol);
-                    } else if (["CRUDE", "BRENT"].includes(symbol)) {
+                    } else if (symbol === "OIL") {
                         updateDotStatus(`dot-OIL`, checkMarketLive(symbol));
+                    } else if (symbol === "BRENT") {
+                        // handled together or via oil
                     } else if (["XAUUSD", "GOLD_MCX"].includes(symbol)) {
                         updateDotStatus(`dot-GOLD`, checkMarketLive(symbol));
                     } else {
                         updateDotStatus(`dot-${symbol}`, checkMarketLive(symbol));
                     }
 
-                    if (res.status === "fulfilled" && res.value && res.value.ltp !== undefined) {
-                        let prefixType = (symbol === "XAUUSD" || symbol === "CRUDE" || symbol === "BRENT") ? "usd" : (symbol === "GOLD_MCX" ? "inr" : "none");
-                        updateElement(`ltp-${symbol}`, `sub-${symbol}`, res.value.ltp, res.value.ch, res.value.chp, prefixType);
+                    if (res.status === "fulfilled" && res.value) {
+                        if (symbol === "OIL" && res.value.ltp !== undefined) {
+                            updateElement(`ltp-OIL`, `sub-OIL`, res.value.ltp, res.value.ch, res.value.chp, "inr");
+                            if (res.value.brent_ltp !== undefined) {
+                                updateElement(`ltp-BRENT`, `sub-BRENT`, res.value.brent_ltp, res.value.brent_ch, res.value.brent_chp, "usd");
+                            }
+                        } else if (symbol !== "BRENT" && res.value.ltp !== undefined) {
+                            let prefixType = (symbol === "XAUUSD") ? "usd" : (symbol === "GOLD_MCX" ? "inr" : "none");
+                            updateElement(`ltp-${symbol}`, `sub-${symbol}`, res.value.ltp, res.value.ch, res.value.chp, prefixType);
 
-                        let elFut = document.getElementById(`fut-${symbol}`);
-                        if (elFut && res.value.fut) {
-                            elFut.innerText = Number(res.value.fut).toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+                            let elFut = document.getElementById(`fut-${symbol}`);
+                            if (elFut && res.value.fut) {
+                                elFut.innerText = Number(res.value.fut).toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+                            }
                         }
                     }
                 });
@@ -539,7 +548,6 @@
             } catch (e) {}
         }
 
-        // ---------------- SYSTEM HEALTH AUTO MONITOR ----------------
         let lastHealthSignature = null;
         let lastHealthStatus = "UNKNOWN";
         let healthToastTimer = null;
@@ -561,6 +569,17 @@
             const p = document.getElementById("healthPanel");
             if (p) p.classList.toggle("show");
         }
+
+        window.addEventListener('click', function(e) {
+            const panel = document.getElementById('healthPanel');
+            const badge = document.getElementById('systemHealthBadge');
+            
+            if (panel && panel.classList.contains('show')) {
+                if (!panel.contains(e.target) && !badge.contains(e.target)) {
+                    panel.classList.remove('show');
+                }
+            }
+        });
 
         function healthStateLabel(status) {
             return status === "OK" ? "OK" : status === "WARNING" ? "WARNING" : status === "ERROR" ? "ERROR" : "CHECKING";
