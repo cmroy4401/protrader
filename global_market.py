@@ -8,6 +8,8 @@ router = APIRouter()
 GLOBAL_CACHE = {
     "SP500": {"symbol": "SP500", "ltp": 5850.00, "ch": 25.50, "chp": 0.44, "market_status": "RED"},
     "NIKKEI": {"symbol": "NIKKEI", "ltp": 0.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
+    "DOW": {"symbol": "DOW", "ltp": 0.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
+    "DOW_FUT": {"symbol": "DOW_FUT", "ltp": 0.0, "market_status": "RED"}
 }
 
 def load_cache_safely():
@@ -54,7 +56,7 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
                     GLOBAL_CACHE[k] = v
 
                 for row in data.get("data", []):
-                    s = row.get("s")
+                    s = row.get("s", "")
                     vals = row.get("d", [])
                     if len(vals) >= 3:
                         p = float(vals[0] or 0)
@@ -90,10 +92,16 @@ def get_global(symbol: str):
     if sym in ["SNP500", "SPX"]:
         sym = "SP500"
     
-    # Load latest from persistent cache to ensure MCX and USD values are always present
     cached_global = load_cache_safely()
     for k, v in cached_global.items():
         GLOBAL_CACHE[k] = v
+
+    if sym == "DOW":
+        dow_data = dict(GLOBAL_CACHE.get("DOW", {"symbol": "DOW", "ltp": 0, "ch": 0, "chp": 0, "market_status": "RED"}))
+        fut_val = GLOBAL_CACHE.get("DOW_FUT", {}).get("ltp", 0)
+        if fut_val > 0:
+            dow_data["fut"] = fut_val
+        return dow_data
 
     if sym in ["GOLD", "XAUUSD"]:
         xau = GLOBAL_CACHE.get("XAUUSD", {"ltp": 0, "ch": 0, "chp": 0})
@@ -110,7 +118,10 @@ def get_global(symbol: str):
         }
 
     if sym in ["OIL", "CRUDE", "BRENT"]:
-        mcx_crude = GLOBAL_CACHE.get("CRUDE_MCX", {"ltp": 0, "ch": 0, "chp": 0})
+        mcx_crude = GLOBAL_CACHE.get("CRUDE_MCX", {})
+        if not mcx_crude or mcx_crude.get("ltp", 0) == 0:
+            mcx_crude = GLOBAL_CACHE.get("WTI_CRUDE", {"ltp": 0, "ch": 0, "chp": 0})
+            
         brent = GLOBAL_CACHE.get("BRENT", {"ltp": 0, "ch": 0, "chp": 0})
         return {
             "symbol": "OIL",
@@ -122,9 +133,6 @@ def get_global(symbol: str):
             "brent_chp": brent.get("chp", 0),
             "market_status": "RED"
         }
-
-    if sym == "DOW" and "DOW" in GLOBAL_CACHE and "DOW_FUT" in GLOBAL_CACHE:
-        GLOBAL_CACHE["DOW"]["fut"] = GLOBAL_CACHE["DOW_FUT"]["ltp"]
 
     if sym in GLOBAL_CACHE:
         return GLOBAL_CACHE[sym]
