@@ -297,7 +297,6 @@ def fetch_upstox_indices():
                     if ltp > 0:
                         indices_parsed["SENSEX"] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2), "market_status": "GREEN"}
 
-                # Capture MCX Gold INR
                 for k, v in raw.items():
                     if "483079" in k or "gold" in k.lower():
                         g_ltp = float(v.get('last_price', 0) or 0)
@@ -382,7 +381,7 @@ def fetch_tradingview_batch():
     payload = {
         "symbols": {
             "tickers": [
-                "TVC:DJI", "TVC:IXIC", "CBOT_MINI:YM1!", "TVC:SPX", "SP:SPX", "AMEX:SPY", "FOREXCOM:SPXUSD", "TVC:NI225",
+                "TVC:DJI", "TVC:IXIC", "CBOT:YM1!", "CBOT_MINI:YM1!", "TVC:SPX", "SP:SPX", "AMEX:SPY", "FOREXCOM:SPXUSD", "TVC:NI225",
                 "TVC:HSI", "SSE:000001", "TVC:KOSPI",
                 "TVC:DEU40", "TVC:CAC40", "TVC:UKX",
                 "NYMEX:CL1!", "NYMEX:BZ1!", "TVC:GOLD"
@@ -467,7 +466,6 @@ def get_global(symbol: str):
     if sym in ["SNP500", "SPX"]:
         sym = "SP500"
     
-    # Combined response for Gold (USD from TradingView + INR from Upstox MCX)
     if sym in ["GOLD", "XAUUSD"]:
         xau = GLOBAL_CACHE.get("XAUUSD", {"ltp": 0, "ch": 0, "chp": 0})
         mcx = GLOBAL_CACHE.get("GOLD_MCX", {"ltp": 0, "ch": 0, "chp": 0})
@@ -482,11 +480,16 @@ def get_global(symbol: str):
             "market_status": "RED"
         }
 
+    if sym == "DOW" and "DOW" in GLOBAL_CACHE and "DOW_FUT" in GLOBAL_CACHE:
+        GLOBAL_CACHE["DOW"]["fut"] = GLOBAL_CACHE["DOW_FUT"]["ltp"]
+
     if sym in GLOBAL_CACHE:
         return GLOBAL_CACHE[sym]
     
     persisted = load_persistent_cache()
     cached_global = persisted.get("global", {})
+    if sym == "DOW" and "DOW" in cached_global and "DOW_FUT" in cached_global:
+        cached_global["DOW"]["fut"] = cached_global["DOW_FUT"]["ltp"]
     if sym in cached_global:
         return cached_global[sym]
     
