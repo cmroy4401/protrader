@@ -133,7 +133,6 @@ GLOBAL_CACHE = load_persistent_cache().get("global", {})
 HEALTH_LOCK = threading.Lock()
 HEALTH_STATE = {
     "upstox": {"status": "UNKNOWN", "last_success": 0, "last_error": "", "http_status": None, "action": "Waiting for first Upstox response."},
-    "yahoo": {"status": "UNKNOWN", "last_success": 0, "last_error": "", "http_status": None, "action": "Waiting for first Yahoo Finance response."},
     "tradingview": {"status": "UNKNOWN", "last_success": 0, "last_error": "", "http_status": None, "action": "Waiting for first TradingView response."},
     "sectors": {"status": "UNKNOWN", "last_success": 0, "last_error": "", "http_status": None, "action": "Waiting for first sector response."},
 }
@@ -161,7 +160,7 @@ def build_health():
             if checks[key]["status"] == "ERROR":
                 checks[key]["status"] = "WARNING"
                 checks[key]["action"] = "Indian market is closed; re-check when NSE/BSE opens."
-    stale_limits = {"upstox": 15, "sectors": 20, "yahoo": 45, "tradingview": 30}
+    stale_limits = {"upstox": 15, "sectors": 20, "tradingview": 30}
     for key, limit in stale_limits.items():
         last = checks[key].get("last_success", 0) or 0
         if checks[key]["status"] == "OK" and last and now - last > limit and (market_open or key not in ("upstox", "sectors")):
@@ -285,64 +284,13 @@ def fetch_upstox_sectors():
     
     return persisted.get("sectors", DEFAULT_SECTORS)
 
-def fetch_nikkei_separately():
-    try:
-        r = requests.get("https://query1.finance.yahoo.com/v8/finance/chart/^N225", headers={'User-Agent': 'Mozilla/5.0'}, timeout=3.0)
-        if r.status_code == 200:
-            health_ok("yahoo", "Yahoo Finance request succeeded.")
-            meta = r.json().get("chart", {}).get("result", [{}])[0].get("meta", {})
-            ltp = float(meta.get("regularMarketPrice") or 0)
-            prev = float(meta.get("previousClose") or meta.get("chartPreviousClose") or ltp)
-            if ltp > 0:
-                ch = round(ltp - prev, 2)
-                chp = round((ch / prev * 100) if prev > 0 else 0, 2)
-                GLOBAL_CACHE["NIKKEI"] = {"symbol": "NIKKEI", "ltp": round(ltp, 2), "ch": ch, "chp": chp, "market_status": "GREEN"}
-        else:
-            health_fail("yahoo", f"HTTP {r.status_code}", r.status_code, "Check Yahoo Finance response/network.")
-    except Exception as e:
-        health_fail("yahoo", e, action="Check internet connection or Yahoo Finance availability.")
-
-def fetch_kospi_separately():
-    try:
-        r = requests.get("https://query1.finance.yahoo.com/v8/finance/chart/^KS11", headers={'User-Agent': 'Mozilla/5.0'}, timeout=3.0)
-        if r.status_code == 200:
-            health_ok("yahoo", "Yahoo Finance request succeeded.")
-            meta = r.json().get("chart", {}).get("result", [{}])[0].get("meta", {})
-            ltp = float(meta.get("regularMarketPrice") or 0)
-            prev = float(meta.get("previousClose") or meta.get("chartPreviousClose") or ltp)
-            if ltp > 0:
-                ch = round(ltp - prev, 2)
-                chp = round((ch / prev * 100) if prev > 0 else 0, 2)
-                GLOBAL_CACHE["KOSPI"] = {"symbol": "KOSPI", "ltp": round(ltp, 2), "ch": ch, "chp": chp, "market_status": "GREEN"}
-        else:
-            health_fail("yahoo", f"HTTP {r.status_code}", r.status_code, "Check Yahoo Finance response/network.")
-    except Exception as e:
-        health_fail("yahoo", e, action="Check internet connection or Yahoo Finance availability.")
-
-def fetch_sp500_separately():
-    try:
-        r = requests.get("https://query1.finance.yahoo.com/v8/finance/chart/^GSPC", headers={'User-Agent': 'Mozilla/5.0'}, timeout=3.0)
-        if r.status_code == 200:
-            health_ok("yahoo", "Yahoo Finance request succeeded.")
-            meta = r.json().get("chart", {}).get("result", [{}])[0].get("meta", {})
-            ltp = float(meta.get("regularMarketPrice") or 0)
-            prev = float(meta.get("previousClose") or meta.get("chartPreviousClose") or ltp)
-            if ltp > 0:
-                ch = round(ltp - prev, 2)
-                chp = round((ch / prev * 100) if prev > 0 else 0, 2)
-                GLOBAL_CACHE["SP500"] = {"symbol": "SP500", "ltp": round(ltp, 2), "ch": ch, "chp": chp, "market_status": "GREEN"}
-        else:
-            health_fail("yahoo", f"HTTP {r.status_code}", r.status_code, "Check Yahoo Finance response/network.")
-    except Exception as e:
-        health_fail("yahoo", e, action="Check internet connection or Yahoo Finance availability.")
-
 def fetch_tradingview_batch():
     headers = {"User-Agent": "Mozilla/5.0", "Origin": "https://www.tradingview.com", "Referer": "https://www.tradingview.com/"}
     payload = {
         "symbols": {
             "tickers": [
-                "TVC:DJI", "TVC:IXIC", "CBOT_MINI:YM1!",
-                "TVC:HSI", "SSE:000001",
+                "TVC:DJI", "TVC:IXIC", "CBOT_MINI:YM1!", "TVC:SPX", "TVC:NI225",
+                "TVC:HSI", "SSE:000001", "TVC:KOSPI",
                 "TVC:DEU40", "TVC:CAC40", "TVC:UKX",
                 "NYMEX:CL1!", "NYMEX:BZ1!", "TVC:GOLD", "BINANCE:BTCUSDT"
             ]
@@ -365,6 +313,9 @@ def fetch_tradingview_batch():
 
                     if "DJI" in s: GLOBAL_CACHE["DOW"] = {**item_data, "symbol": "DOW", "market_status": "RED"}
                     elif "IXIC" in s: GLOBAL_CACHE["NASDAQ"] = {**item_data, "symbol": "NASDAQ", "market_status": "RED"}
+                    elif "SPX" in s: GLOBAL_CACHE["SP500"] = {**item_data, "symbol": "SP500", "market_status": "RED"}
+                    elif "NI225" in s: GLOBAL_CACHE["NIKKEI"] = {**item_data, "symbol": "NIKKEI", "market_status": "RED"}
+                    elif "KOSPI" in s: GLOBAL_CACHE["KOSPI"] = {**item_data, "symbol": "KOSPI", "market_status": "RED"}
                     elif "YM1!" in s: GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": round(p, 2), "market_status": "RED"}
                     elif "HSI" in s: GLOBAL_CACHE["HANGSENG"] = {**item_data, "symbol": "HANGSENG", "market_status": "RED"}
                     elif "000001" in s: GLOBAL_CACHE["SHANGHAI"] = {**item_data, "symbol": "SHANGHAI", "market_status": "RED"}
@@ -393,9 +344,6 @@ def global_background_worker():
     while True:
         try:
             fetch_tradingview_batch()
-            fetch_nikkei_separately()
-            fetch_kospi_separately()
-            fetch_sp500_separately()
         except Exception:
             pass
         time.sleep(10)
