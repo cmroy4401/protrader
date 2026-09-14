@@ -5,6 +5,7 @@ router = APIRouter()
 
 GLOBAL_CACHE = {
     "SP500": {"symbol": "SP500", "ltp": 5850.00, "ch": 25.50, "chp": 0.44, "market_status": "RED"},
+    "NIKKEI": {"symbol": "NIKKEI", "ltp": 0.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
 }
 
 def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_func, health_ok_func, health_fail_func):
@@ -16,8 +17,8 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
     payload = {
         "symbols": {
             "tickers": [
-                "TVC:DJI", "CBOT:YM1!", "TVC:IXIC", "TVC:SPX", 
-                "NYMEX:CL1!", "NYMEX:BZ1!", "TVC:GOLD"
+                "TVC:DJI", "CBOT:YM1!", "TVC:IXIC", "TVC:SPX", "SP:SPX", "AMEX:SPY", "FOREXCOM:SPXUSD",
+                "TVC:NI225", "NYMEX:CL1!", "NYMEX:BZ1!", "TVC:GOLD"
             ]
         },
         "columns": ["close", "change", "change_abs"]
@@ -47,7 +48,12 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
                         if "DJI" in s: GLOBAL_CACHE["DOW"] = {**item_data, "symbol": "DOW", "market_status": "RED"}
                         elif "YM1!" in s: GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": round(p, 2), "market_status": "RED"}
                         elif "IXIC" in s: GLOBAL_CACHE["NASDAQ"] = {**item_data, "symbol": "NASDAQ", "market_status": "RED"}
-                        elif "SPX" in s: GLOBAL_CACHE["SP500"] = {**item_data, "symbol": "SP500", "market_status": "RED"}
+                        elif "SPX" in s or "SPXUSD" in s:
+                            if "SPY" in s and p < 1000:
+                                p *= 10; ch *= 10
+                                item_data = {"ltp": round(p, 2), "ch": round(ch, 2), "chp": chp}
+                            GLOBAL_CACHE["SP500"] = {**item_data, "symbol": "SP500", "market_status": "RED"}
+                        elif "NI225" in s: GLOBAL_CACHE["NIKKEI"] = {**item_data, "symbol": "NIKKEI", "market_status": "RED"}
                         elif "CL1!" in s: GLOBAL_CACHE["CRUDE"] = {**item_data, "symbol": "CRUDE", "market_status": "RED"}
                         elif "BZ1!" in s: GLOBAL_CACHE["BRENT"] = {**item_data, "symbol": "BRENT", "market_status": "RED"}
                         elif "GOLD" in s:
