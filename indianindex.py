@@ -13,17 +13,15 @@ DEFAULT_INDICES = {
     "SENSEX": {"ltp": 76106.15, "ch": -423.49, "chp": -0.56, "market_status": "GREEN"},
 }
 
-# Cache for dynamic MCX keys to avoid downloading instrument file on every request
 MCX_KEY_CACHE = {
-    "crude_key": "MCX_FO|584777",  # Fallback
-    "gold_key": "MCX_FO|483079",   # Fallback
+    "crude_key": "MCX_FO|584777",
+    "gold_key": "MCX_FO|483079",
     "last_fetched": 0
 }
 
 def get_dynamic_mcx_keys(session):
     global MCX_KEY_CACHE
     now = time.time()
-    # Refresh once every 24 hours
     if now - MCX_KEY_CACHE["last_fetched"] < 86400 and MCX_KEY_CACHE["crude_key"] != "MCX_FO|584777":
         return MCX_KEY_CACHE["crude_key"], MCX_KEY_CACHE["gold_key"]
     
@@ -52,8 +50,8 @@ def get_dynamic_mcx_keys(session):
                     except Exception:
                         pass
                         
-                # Filter for Gold Futures
-                if "GOLD" in sym and instrument_type == "FUT" and "MINI" not in sym:
+                # Filter strictly for Standard Gold Futures (Exclude Petal, Guinea, Options)
+                if sym.startswith("GOLD") and instrument_type == "FUT" and "PETAL" not in sym and "GUINEA" not in sym and "OPT" not in sym:
                     try:
                         exp_date = datetime.fromtimestamp(int(expiry) / 1000).date() if isinstance(expiry, (int, float)) else datetime.strptime(str(expiry)[:10], "%Y-%m-%d").date()
                         if exp_date >= today:
@@ -61,7 +59,6 @@ def get_dynamic_mcx_keys(session):
                     except Exception:
                         pass
             
-            # Sort by nearest expiry
             if crude_candidates:
                 crude_candidates.sort(key=lambda x: x[0])
                 MCX_KEY_CACHE["crude_key"] = crude_candidates[0][1]
