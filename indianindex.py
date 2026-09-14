@@ -38,11 +38,10 @@ def get_dynamic_mcx_keys(session):
             
             for inst in instruments:
                 sym = inst.get("trading_symbol", "")
-                instrument_type = inst.get("instrument_type", "")
+                inst_type = inst.get("instrument_type", "")
                 expiry = inst.get("expiry", 0)
                 
-                # Filter for Crude Oil Futures
-                if "CRUDEOIL" in sym and instrument_type == "FUT":
+                if "CRUDEOIL" in sym and inst_type == "FUT":
                     try:
                         exp_date = datetime.fromtimestamp(int(expiry) / 1000).date() if isinstance(expiry, (int, float)) else datetime.strptime(str(expiry)[:10], "%Y-%m-%d").date()
                         if exp_date >= today:
@@ -50,8 +49,7 @@ def get_dynamic_mcx_keys(session):
                     except Exception:
                         pass
                         
-                # Filter strictly for Standard Gold Futures (Exclude Petal, Guinea, Options)
-                if sym.startswith("GOLD") and instrument_type == "FUT" and "PETAL" not in sym and "GUINEA" not in sym and "OPT" not in sym:
+                if sym.startswith("GOLD") and inst_type == "FUT" and "PETAL" not in sym and "GUINEA" not in sym and "OPT" not in sym:
                     try:
                         exp_date = datetime.fromtimestamp(int(expiry) / 1000).date() if isinstance(expiry, (int, float)) else datetime.strptime(str(expiry)[:10], "%Y-%m-%d").date()
                         if exp_date >= today:
@@ -75,14 +73,21 @@ def get_dynamic_mcx_keys(session):
 
 def fetch_upstox_indices(session, access_token, cache, global_cache, api_timeout, is_cache_valid_func, load_cache_func, save_cache_func, health_ok_func, health_fail_func):
     now = time.time()
-    if is_cache_valid_func(cache.get("indices_time", 0), 5.0) and cache.get("indices_data"):
-        return cache["indices_data"]
     
     persisted = load_cache_func()
     indices_parsed = dict(persisted.get("indices", DEFAULT_INDICES))
     
+    # Load persistent global cache into global_cache immediately so 0.00 never shows up
+    persisted_global = persisted.get("global", {})
+    for k, v in persisted_global.items():
+        if k not in global_cache or global_cache[k].get("ltp", 0) == 0:
+            global_cache[k] = v
+
+    if is_cache_valid_func(cache.get("indices_time", 0), 5.0) and cache.get("indices_data"):
+        return cache["indices_data"]
+    
     if not access_token:
-        health_fail_func("upstox", "ACCESS_TOKEN is missing", action="Add a valid Upstox access token.")
+        health_fail_func("upstox", "ACCESS_TOKEN is missing", action="Add a valid Upstox access token in config.py.")
         return indices_parsed
     
     crude_key, gold_key = get_dynamic_mcx_keys(session)
@@ -159,7 +164,7 @@ def fetch_upstox_indices(session, access_token, cache, global_cache, api_timeout
                         if c_ltp > 0:
                             global_cache["CRUDE_MCX"] = {"symbol": "CRUDE_MCX", "ltp": round(c_ltp, 2), "ch": round(c_ch, 2), "chp": round(c_chp, 2), "market_status": "GREEN"}
         else:
-            health_fail_func("upstox", f"HTTP {res.status_code}", res.status_code)
+            health_fail_func("upstox", f"HTTP {res.status_code} - Check Upstox Access Token", res.status_code)
     except Exception as e:
         health_fail_func("upstox", str(e))
     
