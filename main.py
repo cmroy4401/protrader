@@ -361,12 +361,16 @@ def get_all_spots():
 @app.get("/api/global")
 def get_global(symbol: str):
     sym = symbol.upper()
+    if sym in ["SNP500", "SPX"]:
+        sym = "SP500"
     if sym == "DOW" and "DOW" in GLOBAL_CACHE and "DOW_FUT" in GLOBAL_CACHE:
         GLOBAL_CACHE["DOW"]["fut"] = GLOBAL_CACHE["DOW_FUT"]["ltp"]
     if sym in GLOBAL_CACHE:
         return GLOBAL_CACHE[sym]
     persisted = load_persistent_cache()
     cached_global = persisted.get("global", {})
+    if sym in ["SNP500", "SPX"]:
+        sym = "SP500"
     if sym == "DOW" and "DOW" in cached_global and "DOW_FUT" in cached_global:
         cached_global["DOW"]["fut"] = cached_global["DOW_FUT"]["ltp"]
     if sym in cached_global:
