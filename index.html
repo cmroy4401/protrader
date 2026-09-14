@@ -13,7 +13,6 @@
         .header h1 { margin: 0; font-size: 18px; font-weight: 800; } .header h1 span { color: #3b82f6; } 
         .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-        /* Fixed Health Panel Overlay for mobile and desktop */
         .health-wrap { position: relative; z-index: 9999; font-family: 'JetBrains Mono', monospace; }
         .health-badge { display:flex; align-items:center; gap:5px; padding:6px 9px; border-radius:6px; border:1px solid #10b981; background:rgba(16,185,129,.14); color:#34d399; font-size:9.5px; font-weight:900; cursor:pointer; box-shadow:0 0 10px rgba(16,185,129,.15); user-select:none; white-space: nowrap; }
         .health-badge.warning { border-color:#f59e0b; background:rgba(245,158,11,.14); color:#fbbf24; }
@@ -126,7 +125,7 @@
         .ticker-item-right { display: flex; flex-direction: column; align-items: flex-end; }
         .ticker-item .ticker-name { font-weight: 700; color: #a1a1aa; font-size: 9.5px; text-transform: uppercase; }
         .ticker-item .ticker-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; }
-        .ticker-item .ticker-sub { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 8.5px; }
+        .ticker-item .ticker-sub { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 8px; }
         @media (min-width: 600px) { .ticker-move { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
         .heatmap-box { background: #141417; border: 1px solid #27272a; border-radius: 8px; padding: 8px; box-sizing: border-box; box-shadow: 0 4px 15px rgba(0,0,0,0.35); }
@@ -248,7 +247,7 @@
     <div class="ticker-wrap"><div class="ticker-move" id="tickerContainer"></div></div>
 
     <!-- 4. NSE SECTORAL HEATMAP -->
-    <div class="section-header"><div class="section-title">4. NSE SECTORAL HEATMAP (23 SECTORS)</div></div>
+    <div class="section-header"><div class="section-title">4. NSE SECTORAL HEATMAP (24 SECTORS)</div></div>
     <div class="heatmap-box">
         <div class="heatmap-grid" id="heatmapContainerTop" style="margin-bottom: 4px;"></div>
         <div class="heatmap-grid" id="heatmapContainerBottom"></div>
@@ -459,7 +458,7 @@
 
                 allSectors.sort((a, b) => b.chp - a.chp);
                 let top12 = allSectors.slice(0, 12);
-                let bottom12 = allSectors.slice(12, 23);
+                let bottom12 = allSectors.slice(12);
 
                 let renderTiles = (list, startIndex) => {
                     let html = '';
@@ -531,7 +530,7 @@
                         let sub1 = document.getElementById(`tsub-${sym}`);
                         let valStr = Number(res.value.ltp).toLocaleString('en-US');
                         let sign = res.value.ch >= 0 ? "+" : "";
-                        let subStr = `${sign}${Number(res.value.chp).toFixed(2)}%`;
+                        let subStr = `${sign}${Number(res.value.ch).toFixed(2)} (${sign}${Number(res.value.chp).toFixed(2)}%)`;
                         let colorClass = res.value.ch >= 0 ? "green-neon" : "red-neon";
 
                         if(t1) { t1.innerText = valStr; t1.className = "ticker-val " + colorClass; }
