@@ -143,6 +143,14 @@
         .tile-price { font-size: 8.5px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: #ffffff; }
         .tile-pct { font-size: 8px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
 
+        /* Scanner Grid Styles */
+        .scanner-container { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+        @media (max-width: 700px) { .scanner-container { grid-template-columns: 1fr; } }
+        .scanner-box { background: #141417; border: 1px solid #27272a; border-radius: 8px; padding: 10px; box-sizing: border-box; }
+        .scanner-table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+        .scanner-table th { text-align: left; color: #a1a1aa; padding-bottom: 6px; border-bottom: 1px solid #27272a; font-size: 9px; }
+        .scanner-table td { padding: 6px 2px; border-bottom: 1px solid #1f1f23; }
+
         .green-neon { color: #34d399; } .red-neon { color: #f87171; } .white-text { color: #ffffff; }
     </style>
 </head>
@@ -254,8 +262,43 @@
     </div>
     </div>
 
-    <!-- SCANNER TAB -->
+    <!-- SCANNER TAB (TAB 2) -->
     <div id="scanner" class="tab-content">
+        <div class="section-header"><div class="section-title">1. MARKET MOVERS — TOP GAINERS & LOSERS</div></div>
+        <div class="scanner-container">
+            <!-- Top 6 Gainers -->
+            <div class="scanner-box">
+                <div style="font-size:11px; font-weight:800; color:#34d399; margin-bottom:8px;">🟢 TOP 6 GAINERS (NSE)</div>
+                <table class="scanner-table">
+                    <thead>
+                        <tr>
+                            <th>SYMBOL</th>
+                            <th style="text-align:right;">LTP</th>
+                            <th style="text-align:right;">CHG %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topGainersBody">
+                        <tr><td colspan="3" style="text-align:center; color:#71717a;">Loading gainers...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <!-- Top 6 Losers -->
+            <div class="scanner-box">
+                <div style="font-size:11px; font-weight:800; color:#f87171; margin-bottom:8px;">🔴 TOP 6 LOSERS (NSE)</div>
+                <table class="scanner-table">
+                    <thead>
+                        <tr>
+                            <th>SYMBOL</th>
+                            <th style="text-align:right;">LTP</th>
+                            <th style="text-align:right;">CHG %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topLosersBody">
+                        <tr><td colspan="3" style="text-align:center; color:#71717a;">Loading losers...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -548,6 +591,35 @@
             } catch (e) {}
         }
 
+        // Fetch Scanner Top Gainers & Losers
+        async function fetchScannerData() {
+            try {
+                let res = await fetch('/api/scanner/gainers-losers');
+                let data = await res.json();
+                if (data && data.status === "success") {
+                    let gHtml = "";
+                    (data.gainers || []).forEach(item => {
+                        gHtml += `<tr>
+                            <td><b>${item.symbol}</b></td>
+                            <td style="text-align:right;">₹${item.ltp.toLocaleString('en-IN', {minimumFractionDigits:2})}</td>
+                            <td style="text-align:right;" class="green-neon">+${item.chp.toFixed(2)}%</td>
+                        </tr>`;
+                    });
+                    document.getElementById('topGainersBody').innerHTML = gHtml || '<tr><td colspan="3" style="text-align:center;">No data</td></tr>';
+
+                    let lHtml = "";
+                    (data.losers || []).forEach(item => {
+                        lHtml += `<tr>
+                            <td><b>${item.symbol}</b></td>
+                            <td style="text-align:right;">₹${item.ltp.toLocaleString('en-IN', {minimumFractionDigits:2})}</td>
+                            <td style="text-align:right;" class="red-neon">${item.chp.toFixed(2)}%</td>
+                        </tr>`;
+                    });
+                    document.getElementById('topLosersBody').innerHTML = lHtml || '<tr><td colspan="3" style="text-align:center;">No data</td></tr>';
+                }
+            } catch(e) {}
+        }
+
         let lastHealthSignature = null;
         let lastHealthStatus = "UNKNOWN";
         let healthToastTimer = null;
@@ -663,11 +735,12 @@
             event.target.classList.add('active');
         }
 
-        fetchIndianData(); fetchGlobalData(); fetchSectorData();
+        fetchIndianData(); fetchGlobalData(); fetchSectorData(); fetchScannerData();
         checkSystemHealth();
         setInterval(fetchIndianData, 2000);   
         setInterval(fetchSectorData, 3000);   
         setInterval(fetchGlobalData, 4000);
+        setInterval(fetchScannerData, 6000);
         setInterval(checkSystemHealth, 7000);
     </script>
 </body>
