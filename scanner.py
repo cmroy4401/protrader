@@ -30,7 +30,6 @@ def fetch_scan(session, api_timeout, sort_order, count=6):
                     if len(vals) >= 5:
                         matched.append({
                             "symbol": s_symbol,
-                            name := vals[0],
                             "name": vals[0],
                             "ltp": round(float(vals[1] or 0), 2),
                             "chp": round(float(vals[2] or 0), 2),
