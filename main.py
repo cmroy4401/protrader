@@ -50,7 +50,6 @@ _cache = {
 
 # Create session with retry strategy
 def create_session():
-    """Create requests session with automatic retry strategy"""
     s = requests.Session()
     retry = Retry(
         total=REQUEST_RETRY_COUNT,
@@ -66,7 +65,6 @@ session = create_session()
 
 @app.get("/")
 async def home():
-    """Serve the main HTML file"""
     html_path = STATIC_DIR / "index.html" if (STATIC_DIR / "index.html").exists() else Path("index.html")
     if not html_path.exists():
         logger.error(f"index.html not found at {html_path}")
@@ -120,47 +118,39 @@ DEFAULT_SECTORS = {
 }
 
 def load_persistent_cache():
-    """Load cache from JSON file"""
     if CACHE_FILE.exists():
         try:
             with open(CACHE_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if data and "indices" in data and len(data["indices"]) > 0:
-                    logger.info("Loaded persistent cache from file")
                     return data
         except Exception as e:
             logger.warning(f"Error loading cache file: {str(e)}")
     
-    default_cache = {
+    return {
         "indices": DEFAULT_INDICES,
         "sectors": DEFAULT_SECTORS,
         "global": {
             "SP500": {"symbol": "SP500", "ltp": 5850.00, "ch": 25.50, "chp": 0.44, "market_status": "RED"}
         },
     }
-    logger.info("Using default cache values")
-    return default_cache
 
 def save_persistent_cache(data):
-    """Save cache to JSON file"""
     try:
         with open(CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
-        logger.debug("Cache saved to file")
     except Exception as e:
         logger.error(f"Error saving cache: {str(e)}")
 
 def is_indian_market_open():
-    """Check if Indian market is open"""
     ist_tz = timezone(timedelta(hours=5, minutes=30))
     now = datetime.now(ist_tz)
-    if now.weekday() >= 5:  # Weekend
+    if now.weekday() >= 5:
         return False
     dec_time = now.hour + (now.minute / 60.0)
     return 9.25 <= dec_time <= 15.5
 
 def is_cache_valid(cache_time, cache_duration):
-    """Check if cache is still valid"""
     return time.time() - cache_time < cache_duration
 
 INDICES_KEYS = [
@@ -208,41 +198,30 @@ HEALTH_STATE = {
 }
 
 def health_ok(source, action=""):
-    """Mark a health source as OK"""
     with HEALTH_LOCK:
         if source in HEALTH_STATE:
             x = HEALTH_STATE[source]
             x.update({"status": "OK", "last_success": time.time(), "last_error": "", "http_status": 200, "action": action or "Data source working normally."})
-            logger.debug(f"Health check OK for {source}")
 
 def health_fail(source, message, http_status=None, action="Check the data source and connection."):
-    """Mark a health source as failed"""
     with HEALTH_LOCK:
         if source in HEALTH_STATE:
             x = HEALTH_STATE[source]
-            error_msg = str(message)[:240]
-            x.update({"status": "ERROR", "last_error": error_msg, "http_status": http_status, "action": action})
-            logger.warning(f"Health check FAILED for {source}: {error_msg}")
+            x.update({"status": "ERROR", "last_error": str(message)[:240], "http_status": http_status, "action": action})
 
 def health_snapshot():
-    """Get current health state snapshot"""
     with HEALTH_LOCK:
         return json.loads(json.dumps(HEALTH_STATE))
 
 def build_health():
-    """Build health report with stale data detection"""
     now = time.time()
     market_open = is_indian_market_open()
     checks = health_snapshot()
-    
-    # Downgrade errors to warnings when market is closed
     if not market_open:
         for key in ("upstox", "sectors"):
             if checks[key]["status"] == "ERROR":
                 checks[key]["status"] = "WARNING"
                 checks[key]["action"] = "Indian market is closed; re-check when NSE/BSE opens."
-    
-    # Check for stale data
     stale_limits = {"upstox": 25, "sectors": 35, "tradingview": 30}
     for key, limit in stale_limits.items():
         last = checks[key].get("last_success", 0) or 0
@@ -250,9 +229,7 @@ def build_health():
             if market_open or key not in ("upstox", "sectors"):
                 checks[key]["status"] = "WARNING"
                 checks[key]["action"] = f"Data is stale ({int(now - last)}s old). Re-fetching..."
-                logger.warning(f"Stale data detected for {key}: {int(now - last)}s old")
     
-    # Determine overall status
     has_error = any(v["status"] == "ERROR" for v in checks.values())
     has_warning = any(v["status"] == "WARNING" for v in checks.values())
     overall = "ERROR" if has_error else "WARNING" if has_warning else "OK"
@@ -264,7 +241,6 @@ def build_health():
     }
 
 def fetch_upstox_indices():
-    """Fetch indices from Upstox API"""
     now = time.time()
     if is_cache_valid(_cache.get("indices_time", 0), 5.0) and _cache.get("indices_data"):
         return _cache["indices_data"]
@@ -273,8 +249,7 @@ def fetch_upstox_indices():
     indices_parsed = dict(persisted.get("indices", DEFAULT_INDICES))
     
     if not ACCESS_TOKEN:
-        logger.error("ACCESS_TOKEN is missing")
-        health_fail("upstox", "ACCESS_TOKEN is missing", action="Add a valid Upstox access token in environment variables.")
+        health_fail("upstox", "ACCESS_TOKEN is missing", action="Add a valid Upstox access token.")
         return indices_parsed
     
     try:
@@ -290,15 +265,8 @@ def fetch_upstox_indices():
             if js.get('status') == 'success':
                 health_ok("upstox", "Upstox indices request succeeded.")
                 raw = js.get('data', {})
-                
-                if not raw:
-                    logger.warning("Empty data from Upstox indices API")
-                    health_fail("upstox", "Empty response", action="Indices data not available.")
-                    return indices_parsed
-                
                 norm = {k.lower().replace("|", ":").strip(): v for k, v in raw.items()}
                 
-                # Parse NIFTY 50
                 if "nse_index:nifty 50" in norm:
                     item = norm["nse_index:nifty 50"]
                     ltp = float(item.get('last_price', 0) or 0)
@@ -309,7 +277,6 @@ def fetch_upstox_indices():
                     if ltp > 0:
                         indices_parsed["NIFTY"] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2), "market_status": "GREEN"}
                 
-                # Parse Nifty Bank
                 if "nse_index:nifty bank" in norm:
                     item = norm["nse_index:nifty bank"]
                     ltp = float(item.get('last_price', 0) or 0)
@@ -320,7 +287,6 @@ def fetch_upstox_indices():
                     if ltp > 0:
                         indices_parsed["BANKNIFTY"] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2), "market_status": "GREEN"}
                 
-                # Parse SENSEX
                 if "bse_index:sensex" in norm:
                     item = norm["bse_index:sensex"]
                     ltp = float(item.get('last_price', 0) or 0)
@@ -330,30 +296,32 @@ def fetch_upstox_indices():
                     chp = float(item.get('change_percent', 0) or ((ch / close * 100) if close > 0 else 0))
                     if ltp > 0:
                         indices_parsed["SENSEX"] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2), "market_status": "GREEN"}
+
+                # Capture MCX Gold INR
+                for k, v in raw.items():
+                    if "483079" in k or "gold" in k.lower():
+                        g_ltp = float(v.get('last_price', 0) or 0)
+                        g_close = float(v.get('ohlc', {}).get('close', 0) or g_ltp)
+                        if g_ltp == 0 and g_close > 0: g_ltp = g_close
+                        g_ch = float(v.get('net_change', 0) or (g_ltp - g_close))
+                        g_chp = float(v.get('change_percent', 0) or ((g_ch / g_close * 100) if g_close > 0 else 0))
+                        if g_ltp > 0:
+                            GLOBAL_CACHE["GOLD_MCX"] = {"symbol": "GOLD_MCX", "ltp": round(g_ltp, 2), "ch": round(g_ch, 2), "chp": round(g_chp, 2), "market_status": "GREEN"}
         else:
-            logger.error(f"Upstox returned HTTP {res.status_code}")
-            health_fail("upstox", f"HTTP {res.status_code}", res.status_code, "Check Upstox access token/permissions or API rate limit.")
-    
-    except requests.Timeout:
-        logger.error("Upstox request timed out")
-        health_fail("upstox", "Request timeout", action="Upstox API is slow. Check network connection.")
-    except requests.RequestException as e:
-        logger.error(f"Upstox request failed: {str(e)}")
-        health_fail("upstox", f"Request failed: {str(e)}", action="Check network connection to Upstox API.")
+            health_fail("upstox", f"HTTP {res.status_code}", res.status_code)
     except Exception as e:
-        logger.error(f"Upstox parsing error: {str(e)}", exc_info=True)
-        health_fail("upstox", f"Parse error: {str(e)}", action="Invalid response format from Upstox.")
+        health_fail("upstox", str(e))
     
     if indices_parsed:
         _cache["indices_data"] = indices_parsed
         _cache["indices_time"] = now
         persisted["indices"] = indices_parsed
+        persisted["global"] = GLOBAL_CACHE
         save_persistent_cache(persisted)
     
     return indices_parsed
 
 def fetch_upstox_sectors():
-    """Fetch sector data from Upstox API"""
     now = time.time()
     if is_cache_valid(_cache.get("sectors_time", 0), 6.0) and _cache.get("sectors_data"):
         return _cache["sectors_data"]
@@ -363,63 +331,38 @@ def fetch_upstox_sectors():
     sectors_parsed = dict(base_sectors)
     
     if not ACCESS_TOKEN:
-        logger.error("ACCESS_TOKEN is missing for sectors")
-        health_fail("sectors", "ACCESS_TOKEN is missing", action="Add a valid Upstox access token in environment variables.")
         return sectors_parsed
     
     keys_list = list(SECTOR_MAPPING.values())
-    
     for i in range(0, len(keys_list), 5):
         chunk = keys_list[i:i+5]
         try:
             time.sleep(MIN_REQUEST_INTERVAL)
-            
             res = session.get(
                 "https://api.upstox.com/v2/market-quote/quotes",
                 headers={'Accept': 'application/json', 'Authorization': f'Bearer {ACCESS_TOKEN}'},
                 params={'instrument_key': ",".join(chunk)},
                 timeout=API_TIMEOUT
             )
-            
             if res.status_code == 200:
-                health_ok("sectors", "Upstox sector request succeeded.")
+                health_ok("sectors")
                 js = res.json()
                 if js.get('status') == 'success':
                     raw = js.get('data', {})
-                    
-                    if not raw:
-                        logger.warning("Empty data from Upstox sectors API")
-                        health_fail("sectors", "Empty response", action="Sector data not available.")
-                        return base_sectors
-                    
                     norm = {k.lower().replace("|", ":").strip(): v for k, v in raw.items()}
                     for sec_name, sec_key in SECTOR_MAPPING.items():
                         target_key = sec_key.lower().replace("|", ":").strip()
                         if target_key in norm:
-                            try:
-                                item = norm.get(target_key)
-                                ltp = float(item.get('last_price', 0) or 0)
-                                close = float(item.get('ohlc', {}).get('close', 0) or ltp)
-                                if ltp == 0 and close > 0: ltp = close
-                                ch = float(item.get('net_change', 0) or (ltp - close))
-                                chp = float(item.get('change_percent', 0) or ((ch / close * 100) if close > 0 else 0))
-                                if ltp > 0:
-                                    sectors_parsed[sec_name] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2)}
-                            except (ValueError, TypeError) as e:
-                                logger.warning(f"Error parsing sector {sec_name}: {str(e)}")
-            else:
-                logger.error(f"Upstox sectors returned HTTP {res.status_code}")
-                health_fail("sectors", f"HTTP {res.status_code}", res.status_code, "Check Upstox rate limit or permissions.")
-        
-        except requests.Timeout:
-            logger.error(f"Sector chunk {i//5} timed out")
-            health_fail("sectors", "Request timeout", action="Upstox API is slow.")
-        except requests.RequestException as e:
-            logger.error(f"Sector request error: {str(e)}")
-            health_fail("sectors", e, action="Check network connection.")
+                            item = norm.get(target_key)
+                            ltp = float(item.get('last_price', 0) or 0)
+                            close = float(item.get('ohlc', {}).get('close', 0) or ltp)
+                            if ltp == 0 and close > 0: ltp = close
+                            ch = float(item.get('net_change', 0) or (ltp - close))
+                            chp = float(item.get('change_percent', 0) or ((ch / close * 100) if close > 0 else 0))
+                            if ltp > 0:
+                                sectors_parsed[sec_name] = {"ltp": round(ltp, 2), "ch": round(ch, 2), "chp": round(chp, 2)}
         except Exception as e:
-            logger.error(f"Sector parsing error: {str(e)}", exc_info=True)
-            health_fail("sectors", e, action="Error parsing sector response.")
+            health_fail("sectors", str(e))
     
     if sectors_parsed:
         _cache["sectors_data"] = sectors_parsed
@@ -431,7 +374,6 @@ def fetch_upstox_sectors():
     return base_sectors
 
 def fetch_tradingview_batch():
-    """Fetch global market data from TradingView"""
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Origin": "https://www.tradingview.com",
@@ -456,17 +398,11 @@ def fetch_tradingview_batch():
             headers=headers,
             timeout=API_TIMEOUT
         )
-        
         if r.status_code == 200:
-            health_ok("tradingview", "TradingView batch request succeeded.")
+            health_ok("tradingview")
             data = r.json()
-            
-            if not data or not data.get("data"):
-                logger.warning("Empty TradingView response")
-                return
-            
-            for row in data.get("data", []):
-                try:
+            if data and data.get("data"):
+                for row in data.get("data", []):
                     s = row.get("s")
                     vals = row.get("d", [])
                     if len(vals) >= 3:
@@ -476,92 +412,49 @@ def fetch_tradingview_batch():
                         if p <= 0: continue
                         item_data = {"ltp": round(p, 2), "ch": round(ch, 2), "chp": round(chp, 2)}
                         
-                        if "DJI" in s:
-                            GLOBAL_CACHE["DOW"] = {**item_data, "symbol": "DOW", "market_status": "RED"}
-                        elif "YM1!" in s:
-                            GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": round(p, 2), "market_status": "RED"}
-                        elif "IXIC" in s:
-                            GLOBAL_CACHE["NASDAQ"] = {**item_data, "symbol": "NASDAQ", "market_status": "RED"}
+                        if "DJI" in s: GLOBAL_CACHE["DOW"] = {**item_data, "symbol": "DOW", "market_status": "RED"}
+                        elif "YM1!" in s: GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": round(p, 2), "market_status": "RED"}
+                        elif "IXIC" in s: GLOBAL_CACHE["NASDAQ"] = {**item_data, "symbol": "NASDAQ", "market_status": "RED"}
                         elif "SPX" in s or "SPXUSD" in s:
                             if "SPY" in s and p < 1000:
-                                p *= 10
-                                ch *= 10
+                                p *= 10; ch *= 10
                                 item_data = {"ltp": round(p, 2), "ch": round(ch, 2), "chp": chp}
                             GLOBAL_CACHE["SP500"] = {**item_data, "symbol": "SP500", "market_status": "RED"}
-                        elif "NI225" in s:
-                            GLOBAL_CACHE["NIKKEI"] = {**item_data, "symbol": "NIKKEI", "market_status": "RED"}
-                        elif "KOSPI" in s:
-                            GLOBAL_CACHE["KOSPI"] = {**item_data, "symbol": "KOSPI", "market_status": "RED"}
-                        elif "HSI" in s:
-                            GLOBAL_CACHE["HANGSENG"] = {**item_data, "symbol": "HANGSENG", "market_status": "RED"}
-                        elif "000001" in s:
-                            GLOBAL_CACHE["SHANGHAI"] = {**item_data, "symbol": "SHANGHAI", "market_status": "RED"}
-                        elif "DEU40" in s:
-                            GLOBAL_CACHE["DAX"] = {**item_data, "symbol": "DAX", "market_status": "RED"}
-                        elif "CAC40" in s:
-                            GLOBAL_CACHE["CAC"] = {**item_data, "symbol": "CAC", "market_status": "RED"}
-                        elif "UKX" in s:
-                            GLOBAL_CACHE["FTSE"] = {**item_data, "symbol": "FTSE", "market_status": "RED"}
-                        elif "CL1!" in s:
-                            GLOBAL_CACHE["CRUDE"] = {**item_data, "symbol": "CRUDE", "market_status": "RED"}
-                        elif "BZ1!" in s:
-                            GLOBAL_CACHE["BRENT"] = {**item_data, "symbol": "BRENT", "market_status": "RED"}
+                        elif "NI225" in s: GLOBAL_CACHE["NIKKEI"] = {**item_data, "symbol": "NIKKEI", "market_status": "RED"}
+                        elif "KOSPI" in s: GLOBAL_CACHE["KOSPI"] = {**item_data, "symbol": "KOSPI", "market_status": "RED"}
+                        elif "HSI" in s: GLOBAL_CACHE["HANGSENG"] = {**item_data, "symbol": "HANGSENG", "market_status": "RED"}
+                        elif "000001" in s: GLOBAL_CACHE["SHANGHAI"] = {**item_data, "symbol": "SHANGHAI", "market_status": "RED"}
+                        elif "DEU40" in s: GLOBAL_CACHE["DAX"] = {**item_data, "symbol": "DAX", "market_status": "RED"}
+                        elif "CAC40" in s: GLOBAL_CACHE["CAC"] = {**item_data, "symbol": "CAC", "market_status": "RED"}
+                        elif "UKX" in s: GLOBAL_CACHE["FTSE"] = {**item_data, "symbol": "FTSE", "market_status": "RED"}
+                        elif "CL1!" in s: GLOBAL_CACHE["CRUDE"] = {**item_data, "symbol": "CRUDE", "market_status": "RED"}
+                        elif "BZ1!" in s: GLOBAL_CACHE["BRENT"] = {**item_data, "symbol": "BRENT", "market_status": "RED"}
                         elif "GOLD" in s:
                             if p < 5000:
                                 GLOBAL_CACHE["XAUUSD"] = {**item_data, "symbol": "XAUUSD", "market_status": "RED"}
-                except (ValueError, TypeError) as e:
-                    logger.warning(f"Error parsing TradingView row: {str(e)}")
-            
-            if "DOW" in GLOBAL_CACHE and "DOW_FUT" in GLOBAL_CACHE:
-                GLOBAL_CACHE["DOW"]["fut"] = GLOBAL_CACHE["DOW_FUT"]["ltp"]
-            
-            persisted = load_persistent_cache()
-            persisted["global"] = GLOBAL_CACHE
-            save_persistent_cache(persisted)
-        else:
-            logger.error(f"TradingView returned HTTP {r.status_code}")
-            health_fail("tradingview", f"HTTP {r.status_code}", r.status_code, "TradingView API rate limit or endpoint issue.")
-    
-    except requests.Timeout:
-        logger.error("TradingView request timed out")
-        health_fail("tradingview", "Request timeout", action="TradingView API is slow.")
-    except requests.RequestException as e:
-        logger.error(f"TradingView request error: {str(e)}")
-        health_fail("tradingview", e, action="Check internet connection or TradingView availability.")
+                
+                persisted = load_persistent_cache()
+                persisted["global"] = GLOBAL_CACHE
+                save_persistent_cache(persisted)
     except Exception as e:
-        logger.error(f"TradingView parsing error: {str(e)}", exc_info=True)
-        health_fail("tradingview", e, action="Error parsing TradingView response.")
+        health_fail("tradingview", str(e))
 
 def global_background_worker():
-    """Background worker to fetch global market data"""
-    logger.info("Starting global background worker")
     while True:
         try:
             fetch_tradingview_batch()
-        except Exception as e:
-            logger.error(f"Background worker error: {str(e)}", exc_info=True)
+        except Exception:
+            pass
         time.sleep(BACKGROUND_FETCH_INTERVAL)
 
-# Start background worker thread
 threading.Thread(target=global_background_worker, daemon=True).start()
-
-@app.get("/api/status")
-def get_status():
-    """Get backend status"""
-    return {
-        "status": "running",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "market_open": is_indian_market_open()
-    }
 
 @app.get("/api/health")
 def get_health():
-    """Get system health check"""
     return build_health()
 
 @app.get("/api/spots")
 def get_all_spots():
-    """Get all Indian market indices"""
     return {
         "status": "success",
         "is_market_live": is_indian_market_open(),
@@ -570,37 +463,37 @@ def get_all_spots():
 
 @app.get("/api/global")
 def get_global(symbol: str):
-    """Get global market data for a symbol"""
     sym = symbol.upper()
     if sym in ["SNP500", "SPX"]:
         sym = "SP500"
     
-    if sym == "DOW" and "DOW" in GLOBAL_CACHE and "DOW_FUT" in GLOBAL_CACHE:
-        GLOBAL_CACHE["DOW"]["fut"] = GLOBAL_CACHE["DOW_FUT"]["ltp"]
-    
+    # Combined response for Gold (USD from TradingView + INR from Upstox MCX)
+    if sym in ["GOLD", "XAUUSD"]:
+        xau = GLOBAL_CACHE.get("XAUUSD", {"ltp": 0, "ch": 0, "chp": 0})
+        mcx = GLOBAL_CACHE.get("GOLD_MCX", {"ltp": 0, "ch": 0, "chp": 0})
+        return {
+            "symbol": "GOLD",
+            "ltp": xau.get("ltp", 0),
+            "ch": xau.get("ch", 0),
+            "chp": xau.get("chp", 0),
+            "inr": mcx.get("ltp", 0),
+            "inr_ch": mcx.get("ch", 0),
+            "inr_chp": mcx.get("chp", 0),
+            "market_status": "RED"
+        }
+
     if sym in GLOBAL_CACHE:
         return GLOBAL_CACHE[sym]
     
     persisted = load_persistent_cache()
     cached_global = persisted.get("global", {})
-    
-    if sym == "DOW" and "DOW" in cached_global and "DOW_FUT" in cached_global:
-        cached_global["DOW"]["fut"] = cached_global["DOW_FUT"]["ltp"]
-    
     if sym in cached_global:
         return cached_global[sym]
     
-    # Default values
-    defaults = {
-        "DOW": {"symbol": "DOW", "ltp": 43500.00, "fut": 43550.00, "ch": 100.00, "chp": 0.23, "market_status": "RED"},
-        "SP500": {"symbol": "SP500", "ltp": 5850.00, "ch": 25.50, "chp": 0.44, "market_status": "RED"},
-    }
-    
-    return defaults.get(sym, {"symbol": symbol.upper(), "ltp": 0, "ch": 0, "chp": 0, "market_status": "UNKNOWN"})
+    return {"symbol": symbol.upper(), "ltp": 0, "ch": 0, "chp": 0, "market_status": "UNKNOWN"}
 
 @app.get("/api/sectors")
 def get_sectors():
-    """Get all sectors data"""
     sectors_data = fetch_upstox_sectors()
     out = []
     for name, info in sectors_data.items():
@@ -618,5 +511,4 @@ def get_sectors():
 
 if __name__ == "__main__":
     import uvicorn
-    logger.info("Starting PRO TRADER application on 0.0.0.0:8000")
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
