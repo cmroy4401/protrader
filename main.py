@@ -59,7 +59,7 @@ DEFAULT_SECTORS = {
     "NIFTY Energy": {"ltp": 39200.0, "ch": -106.0, "chp": -0.27},
     "NIFTY PSE": {"ltp": 7850.0, "ch": -13.0, "chp": -0.17},
     "Nifty India Defence": {"ltp": 6200.0, "ch": 21.0, "chp": 0.35},
-    "NIFTY India Mfg": {"ltp": 15400.0, "ch": -29.0, "chp": -0.19},
+    "Nifty India Mfg": {"ltp": 15400.0, "ch": -29.0, "chp": -0.19},
     "MIDSMALL IT": {"ltp": 21000.0, "ch": 310.0, "chp": 1.50},
     "NIFTY Bank": {"ltp": 57134.15, "ch": -101.95, "chp": -0.18}
 }
@@ -125,7 +125,7 @@ SECTOR_MAPPING = {
     "NIFTY Energy": "NSE_INDEX|Nifty Energy",
     "NIFTY PSE": "NSE_INDEX|Nifty PSE",
     "Nifty India Defence": "NSE_INDEX|Nifty India Defence",
-    "NIFTY India Mfg": "NSE_INDEX|Nifty India Mfg",
+    "Nifty India Mfg": "NSE_INDEX|Nifty India Mfg",
     "MIDSMALL IT": "NSE_INDEX|Nifty MidSmall IT & Telecom",
     "NIFTY Bank": "NSE_INDEX|Nifty Bank"
 }
@@ -299,7 +299,7 @@ def fetch_tradingview_batch():
                 "TVC:DJI", "TVC:IXIC", "CBOT_MINI:YM1!", "TVC:SPX", "SP:SPX", "AMEX:SPY", "FOREXCOM:SPXUSD", "TVC:NI225",
                 "TVC:HSI", "SSE:000001", "TVC:KOSPI",
                 "TVC:DEU40", "TVC:CAC40", "TVC:UKX",
-                "NYMEX:CL1!", "NYMEX:BZ1!", "TVC:GOLD", "BINANCE:BTCUSDT"
+                "NYMEX:CL1!", "NYMEX:BZ1!", "TVC:GOLD"
             ]
         },
         "columns": ["close", "change", "change_abs"]
@@ -339,7 +339,6 @@ def fetch_tradingview_batch():
                     elif "GOLD" in s: 
                         if p < 5000:
                             GLOBAL_CACHE["XAUUSD"] = {**item_data, "symbol": "XAUUSD", "market_status": "RED"}
-                    elif "BTCUSDT" in s: GLOBAL_CACHE["BTC"] = {**item_data, "symbol": "BTC", "market_status": "GREEN"}
 
             if "DOW" in GLOBAL_CACHE and "DOW_FUT" in GLOBAL_CACHE:
                 GLOBAL_CACHE["DOW"]["fut"] = GLOBAL_CACHE["DOW_FUT"]["ltp"]
