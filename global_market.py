@@ -7,13 +7,13 @@ from fastapi import APIRouter
 router = APIRouter()
 
 GLOBAL_CACHE = {
-    "DOW": {"symbol": "DOW", "ltp": 43000.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
-    "DOW_FUT": {"symbol": "DOW_FUT", "ltp": 43000.0, "market_status": "RED"},
-    "NASDAQ": {"symbol": "NASDAQ", "ltp": 18500.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
-    "SP500": {"symbol": "SP500", "ltp": 5850.00, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
-    "NIKKEI": {"symbol": "NIKKEI", "ltp": 38000.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
-    "BRENT": {"symbol": "BRENT", "ltp": 74.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
-    "XAUUSD": {"symbol": "XAUUSD", "ltp": 2650.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"}
+    "DOW": {"symbol": "DOW", "ltp": 0.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
+    "DOW_FUT": {"symbol": "DOW_FUT", "ltp": 0.0, "market_status": "RED"},
+    "NASDAQ": {"symbol": "NASDAQ", "ltp": 0.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
+    "SP500": {"symbol": "SP500", "ltp": 0.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
+    "NIKKEI": {"symbol": "NIKKEI", "ltp": 0.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
+    "BRENT": {"symbol": "BRENT", "ltp": 0.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"},
+    "XAUUSD": {"symbol": "XAUUSD", "ltp": 0.0, "ch": 0.0, "chp": 0.0, "market_status": "RED"}
 }
 
 def load_cache_safely():
@@ -50,10 +50,9 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
     try:
         cached_data = load_cache_safely()
         for k, v in cached_data.items():
-            if k in GLOBAL_CACHE:
+            if k in GLOBAL_CACHE and v.get("ltp", 0) > 0:
                 GLOBAL_CACHE[k] = v
 
-        # Fetch Dow Spot, Dow Future, Nasdaq, S&P from TradingView
         tv_headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Origin": "https://www.tradingview.com",
@@ -61,7 +60,10 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
         }
         tv_payload = {
             "symbols": {
-                "tickers": ["TVC:DJI", "CBOT:YM1!", "TVC:IXIC", "TVC:SPX", "SP:SPX", "AMEX:SPY"]
+                "tickers": [
+                    "TVC:DJI", "CBOT:YM1!", "CBOT:YM", "CAPITALCOM:US30", 
+                    "TVC:IXIC", "TVC:SPX", "SP:SPX", "AMEX:SPY", "TVC:NI225"
+                ]
             },
             "columns": ["close", "change", "change_abs"]
         }
@@ -82,19 +84,19 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
                         
                         if s == "TVC:DJI":
                             GLOBAL_CACHE["DOW"] = {**item_data, "symbol": "DOW", "market_status": "RED"}
-                        elif s == "CBOT:YM1!":
+                        elif "YM" in s or "US30" in s:
                             GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": round(p, 2), "market_status": "RED"}
                         elif s == "TVC:IXIC":
                             GLOBAL_CACHE["NASDAQ"] = {**item_data, "symbol": "NASDAQ", "market_status": "RED"}
+                        elif s == "TVC:NI225":
+                            GLOBAL_CACHE["NIKKEI"] = {**item_data, "symbol": "NIKKEI", "market_status": "RED"}
                         elif "SPX" in s or "SPY" in s:
                             if "SPY" in s and p < 1000:
                                 p *= 10; ch *= 10
                                 item_data = {"ltp": round(p, 2), "ch": round(ch, 2), "chp": chp}
                             GLOBAL_CACHE["SP500"] = {**item_data, "symbol": "SP500", "market_status": "RED"}
 
-        # Fetch Nikkei, Brent, and Gold USD from Yahoo Finance
         yahoo_mapping = {
-            "NIKKEI": "^N225",
             "BRENT": "BZ=F",
             "XAUUSD": "GC=F"
         }
@@ -118,7 +120,7 @@ def get_global(symbol: str):
     
     cached_global = load_cache_safely()
     for k, v in cached_global.items():
-        if k in GLOBAL_CACHE:
+        if k in GLOBAL_CACHE and v.get("ltp", 0) > 0:
             GLOBAL_CACHE[k] = v
 
     if sym == "DOW":
