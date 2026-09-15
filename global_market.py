@@ -53,7 +53,7 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
             if k in GLOBAL_CACHE and v.get("ltp", 0) > 0:
                 GLOBAL_CACHE[k] = v
 
-        # Fetch Dow Spot, Dow Future, Nasdaq, S&P, and Nikkei strictly from TradingView
+        # Fetch Dow Spot, robust Dow Future/CFD tickers, Nasdaq, S&P, and Nikkei from TradingView
         tv_headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Origin": "https://www.tradingview.com",
@@ -61,7 +61,10 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
         }
         tv_payload = {
             "symbols": {
-                "tickers": ["TVC:DJI", "CBOT:YM1!", "TVC:IXIC", "TVC:SPX", "SP:SPX", "AMEX:SPY", "TVC:NI225"]
+                "tickers": [
+                    "TVC:DJI", "CBOT:YM1!", "CAPITALCOM:US30", "FOREXCOM:US30", 
+                    "TVC:IXIC", "TVC:SPX", "SP:SPX", "AMEX:SPY", "TVC:NI225"
+                ]
             },
             "columns": ["close", "change", "change_abs"]
         }
@@ -82,8 +85,10 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
                         
                         if s == "TVC:DJI":
                             GLOBAL_CACHE["DOW"] = {**item_data, "symbol": "DOW", "market_status": "RED"}
-                        elif s == "CBOT:YM1!":
-                            GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": round(p, 2), "market_status": "RED"}
+                        elif "YM" in s or "US30" in s:
+                            # Only accept future/CFD price if it's logically close to spot range (> 20000)
+                            if p > 20000:
+                                GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": round(p, 2), "market_status": "RED"}
                         elif s == "TVC:IXIC":
                             GLOBAL_CACHE["NASDAQ"] = {**item_data, "symbol": "NASDAQ", "market_status": "RED"}
                         elif s == "TVC:NI225":
