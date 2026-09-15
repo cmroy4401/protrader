@@ -40,10 +40,12 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
             "Origin": "https://www.tradingview.com",
             "Referer": "https://www.tradingview.com/"
         }
+        
+        # Using CAPITALCOM:US30 for accurate live US30 Future/CFD pricing without roll-over gaps
         payload = {
             "symbols": {
                 "tickers": [
-                    "TVC:DJI", "TVC:IXIC", "CBOT:YM1!", "CBOT_MINI:YM1!", "TVC:SPX", "SP:SPX", "AMEX:SPY", "TVC:NI225",
+                    "TVC:DJI", "TVC:IXIC", "CAPITALCOM:US30", "TVC:SPX", "SP:SPX", "AMEX:SPY", "TVC:NI225",
                     "NYMEX:CL1!", "NYMEX:BZ1!", "TVC:GOLD"
                 ]
             },
@@ -72,7 +74,7 @@ def fetch_tradingview_global(session, api_timeout, load_cache_func, save_cache_f
                         
                         if "DJI" in s: 
                             GLOBAL_CACHE["DOW"] = {**item_data, "symbol": "DOW", "market_status": "RED"}
-                        elif "YM1!" in s: 
+                        elif "US30" in s or "CAPITALCOM" in s: 
                             GLOBAL_CACHE["DOW_FUT"] = {"symbol": "DOW_FUT", "ltp": round(p, 2), "market_status": "RED"}
                         elif "IXIC" in s: 
                             GLOBAL_CACHE["NASDAQ"] = {**item_data, "symbol": "NASDAQ", "market_status": "RED"}
